@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node (viewer/dist IS committed — it is the script-tag deliverable)
+node_modules/
+
+# Pipeline outputs / scratch
+out/
+*.mp4
+*.mov
+*.MOV
+*.ply
+*.splat
+*.ksplat
+*.spz
+scenes/
+workdir/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

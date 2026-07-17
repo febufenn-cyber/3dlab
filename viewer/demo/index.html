@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SceneForge — embed demo</title>
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; max-width: 860px;
+         margin: 40px auto; padding: 0 16px; color: #222; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  .note { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>SceneForge embed demo</h1>
+<p>This is the whole integration — one script, one tag:</p>
+<pre>&lt;script src="../dist/rf.js"&gt;&lt;/script&gt;
+&lt;rf-walkthrough
+    src="./sample/scene.ksplat"
+    poster="./sample/poster.png"
+    mode="walk"
+    height="480px"&gt;&lt;/rf-walkthrough&gt;</pre>
+
+<script src="../dist/rf.js"></script>
+<rf-walkthrough
+    src="./sample/scene.ksplat"
+    poster="./sample/poster.png"
+    mode="walk"
+    height="480px"></rf-walkthrough>
+
+<p class="note">
+  Serve this folder over HTTP (<code>python -m http.server</code> from
+  <code>viewer/</code>) and drop a real scene's <code>scene.ksplat</code> +
+  <code>poster.png</code> into <code>viewer/demo/sample/</code> — the output of
+  <code>rf-scene build video.mp4 -o out/</code> works as-is. Until then the tile
+  shows an honest load error instead of a fake scene: SceneForge never invents
+  geometry, including here.
+</p>
+</body>
+</html>

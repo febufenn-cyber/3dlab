@@ -1,0 +1,66 @@
+# SceneForge GPU worker — x86_64 + CUDA. NEVER deployed on the OCI ARM VM
+# (brief §5: the API host cannot run the pipeline).
+#
+# Base: colmap/colmap CUDA image (BSD-3 project; image ships COLMAP with CUDA
+# SIFT). GLOMAP note (verified 2026-07-17): the standalone GLOMAP repo is
+# archived — its global mapper merged into COLMAP 4.1.0 as `colmap
+# global_mapper`. The pipeline auto-detects: with a COLMAP ≥4.1 base image the
+# glomap build stage below is dead weight and can be dropped; with the pinned
+# 3.x-era base it is required. gsplat compiles its CUDA kernels on first use
+# unless prebuilt wheels match the torch/CUDA pair — pinned so the build is
+# reproducible.
+#
+# Build (repo root):  docker build -f api/docker/Dockerfile.worker -t sceneforge-worker .
+# Run:                docker run --gpus all --env-file .env sceneforge-worker
+
+FROM colmap/colmap:20240918.6 AS colmap-base
+# ^ pin: verify the current tag with `docker pull colmap/colmap` and record the
+#   digest in DECISIONS.md when deploying; the tag above existed at design time.
+
+# ---- build GLOMAP ------------------------------------------------------------
+FROM colmap-base AS glomap-build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git cmake ninja-build build-essential libeigen3-dev libceres-dev && \
+    rm -rf /var/lib/apt/lists/*
+ARG GLOMAP_TAG=1.1.0
+RUN git clone --depth 1 --branch ${GLOMAP_TAG} https://github.com/colmap/glomap.git /src/glomap && \
+    cmake -S /src/glomap -B /build/glomap -GNinja -DCMAKE_BUILD_TYPE=Release && \
+    ninja -C /build/glomap && \
+    ninja -C /build/glomap install
+
+# ---- runtime -----------------------------------------------------------------
+FROM colmap-base
+COPY --from=glomap-build /usr/local/bin/glomap /usr/local/bin/glomap
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3-pip ffmpeg nodejs npm wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# COLMAP vocab tree for sequential-matcher loop detection (public artifact).
+RUN mkdir -p /opt/colmap && \
+    wget -q https://demuc.de/colmap/vocab_tree_flickr100K_words32K.bin \
+      -O /opt/colmap/vocab_tree_flickr100K_words32K.bin
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
+RUN python3.11 -m venv /opt/venv
+
+# Torch pinned to a CUDA build matching the base image's CUDA runtime.
+RUN pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install gsplat==1.5.3 transformers==5.14.1 accelerate
+
+COPY pipeline /app/pipeline
+COPY api/sceneforge_api /app/api/sceneforge_api
+COPY api/sceneforge_worker /app/api/sceneforge_worker
+COPY api/pyproject.toml /app/api/pyproject.toml
+COPY viewer/tools /app/viewer/tools
+COPY viewer/package.json /app/viewer/package.json
+RUN pip install /app/pipeline && pip install /app/api && \
+    cd /app/viewer && npm install --omit=dev --no-audit --no-fund
+
+# Warm the OWLv2 checkpoint into the image so jobs don't cold-download ~600 MB.
+RUN python -c "from transformers import pipeline; \
+    pipeline('zero-shot-object-detection', model='google/owlv2-base-patch16-ensemble')" \
+    || echo 'WARN: model prefetch failed; will download at runtime'
+
+CMD ["arq", "sceneforge_worker.arq_worker.WorkerSettings"]
