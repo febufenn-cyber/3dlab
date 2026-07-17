@@ -4,7 +4,9 @@ __pycache__/
 *.egg-info/
 .eggs/
 build/
-dist/
+pipeline/dist/
+api/dist/
+# viewer/dist IS committed — it is the script-tag deliverable
 .venv/
 venv/
 .pytest_cache/
