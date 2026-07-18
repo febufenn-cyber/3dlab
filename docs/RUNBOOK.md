@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | API + Postgres + Valkey | OCI Always-Free Ampere A1 VM | **2 OCPU / 12 GB RAM** (1,500 OCPU-hrs + 9,000 GB-hrs/mo — HALVED from 4/24 on 2026-06-15 with no announcement; brief's figure is stale). 200 GB block volume, 10 TB egress. Watch for silent limit changes; existing over-limit instances were stopped by Oracle. |
 | Splat/asset storage | Cloudflare R2 | 10 GB-mo storage, 1 M class-A + 10 M class-B ops/mo, **zero egress** — ~400 scenes at 25 MB before paying $0.015/GB-mo |
-| Viewer CDN (`rf.js`) + demo | GitHub Pages / Cloudflare Pages | free for public repos |
+| Viewer CDN (`rf.js`) + demo | GitHub Pages / Cloudflare Pages | free for public repos. One-time setup: repo Settings → Pages → Source: **GitHub Actions**; then `.github/workflows/pages.yml` deploys `/demo/` + `/dist/rf.js` on every push to main |
 | GPU (choose per env `SCENEFORGE_GPU_WORKER`) | see below | no always-free GPU exists anywhere — adapters below |
 | CI | GitHub Actions | free unlimited standard-runner minutes for public repos (2,000 min/mo if private) |
 
