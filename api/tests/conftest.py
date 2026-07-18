@@ -28,8 +28,10 @@ async def api(tmp_path):
 
     await database.create_all()
     key_id, plain, key_hash = mint_api_key()
+    w_id, w_plain, w_hash = mint_api_key()
     async with database.sessionmaker() as session:
-        session.add(ApiKey(id=key_id, key_hash=key_hash, name="test"))
+        session.add(ApiKey(id=key_id, key_hash=key_hash, name="test-customer"))
+        session.add(ApiKey(id=w_id, key_hash=w_hash, name="test-worker", is_worker=True))
         await session.commit()
 
     transport = ASGITransport(app=app)
@@ -42,6 +44,7 @@ async def api(tmp_path):
             "api_key": plain,
             "key_id": key_id,
             "headers": {"Authorization": f"Bearer {plain}"},
+            "worker_headers": {"Authorization": f"Bearer {w_plain}"},
         }
         yield client, ctx
     await database.dispose()

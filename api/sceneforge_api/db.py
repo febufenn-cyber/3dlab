@@ -37,6 +37,8 @@ class ApiKey(Base):
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     active: Mapped[bool] = mapped_column(default=True)
+    # Worker keys may post to the _result callback; customer keys may not.
+    is_worker: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

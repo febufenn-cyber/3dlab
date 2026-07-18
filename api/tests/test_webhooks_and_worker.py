@@ -17,6 +17,29 @@ def test_signature_matches_manual_hmac():
     assert sign("secret", body) == expected
 
 
+def test_ssrf_guard_blocks_internal_targets():
+    from sceneforge_api.webhooks import is_url_allowed
+
+    for bad in [
+        "http://127.0.0.1:8000/steal",
+        "http://localhost/x",
+        "http://169.254.169.254/latest/meta-data/",  # cloud metadata endpoint
+        "http://10.0.0.5/hook",
+        "http://192.168.1.1/hook",
+        "ftp://example.com/x",
+        "not-a-url",
+        "http://[::1]/x",
+    ]:
+        assert not is_url_allowed(bad), bad
+
+
+def test_ssrf_guard_allows_public_hosts():
+    from sceneforge_api.webhooks import is_url_allowed
+
+    # dns.google resolves to public anycast IPs — stable enough for CI.
+    assert is_url_allowed("https://dns.google/hook")
+
+
 async def test_webhook_fires_on_success(api, monkeypatch):
     client, ctx = api
     deliveries = []
@@ -40,7 +63,7 @@ async def test_webhook_fires_on_success(api, monkeypatch):
     await client.post(
         f"/v1/scenes/{sid}/_result",
         json={"state": "succeeded", "quality_report": {"status": "succeeded"}},
-        headers=ctx["headers"],
+        headers=ctx["worker_headers"],
     )
     assert len(deliveries) == 1
     url, payload, _ = deliveries[0]
@@ -68,7 +91,7 @@ async def test_no_webhook_for_processing(api, monkeypatch):
     )
     sid = r.json()["scene_id"]
     await client.post(
-        f"/v1/scenes/{sid}/_result", json={"state": "processing"}, headers=ctx["headers"]
+        f"/v1/scenes/{sid}/_result", json={"state": "processing"}, headers=ctx["worker_headers"]
     )
     assert deliveries == []
 

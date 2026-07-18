@@ -57,6 +57,8 @@ COPY viewer/tools /app/viewer/tools
 COPY viewer/package.json /app/viewer/package.json
 RUN pip install /app/pipeline && pip install /app/api && \
     cd /app/viewer && npm install --omit=dev --no-audit --no-fund
+# pip-installed pipeline lives in site-packages: point it at the converter.
+ENV SCENEFORGE_KSPLAT_TOOL=/app/viewer/tools/convert-to-ksplat.mjs
 
 # Warm the OWLv2 checkpoint into the image so jobs don't cold-download ~600 MB.
 RUN python -c "from transformers import pipeline; \

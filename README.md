@@ -36,7 +36,7 @@ Estimates are never survey-grade and say so.
 
 ```bash
 pip install -e pipeline[dev] -e api[dev]
-python -m pytest pipeline/tests api/tests          # 79 tests
+python -m pytest pipeline/tests api/tests          # 82 tests
 rf-scene schema                                     # frozen contract v1.0
 uvicorn sceneforge_api.main:app                     # dev API (SQLite + local storage)
 cd viewer && npm install && npm run build           # dist/rf.js

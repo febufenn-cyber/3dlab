@@ -17,15 +17,16 @@ from .db import ApiKey, Database, mint_api_key
 from .settings import get_settings
 
 
-async def _create(name: str) -> int:
+async def _create(name: str, is_worker: bool = False) -> int:
     db = Database(get_settings().database_url)
     await db.create_all()
     key_id, plain, key_hash = mint_api_key()
     async with db.sessionmaker() as session:
-        session.add(ApiKey(id=key_id, key_hash=key_hash, name=name))
+        session.add(ApiKey(id=key_id, key_hash=key_hash, name=name, is_worker=is_worker))
         await session.commit()
     await db.dispose()
-    print(f"key_id: {key_id}\nname:   {name}\napi_key: {plain}")
+    role = "worker" if is_worker else "customer"
+    print(f"key_id: {key_id}\nname:   {name}\nrole:   {role}\napi_key: {plain}")
     print("\nStore this key now — it is hashed server-side and cannot be shown again.")
     return 0
 
@@ -63,12 +64,16 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="command", required=True)
     c = sub.add_parser("create")
     c.add_argument("--name", required=True)
+    c.add_argument(
+        "--worker", action="store_true",
+        help="mint a worker key (may post pipeline results; give to GPU workers only)",
+    )
     sub.add_parser("list")
     r = sub.add_parser("revoke")
     r.add_argument("key_id")
     args = p.parse_args(argv)
     if args.command == "create":
-        return asyncio.run(_create(args.name))
+        return asyncio.run(_create(args.name, is_worker=args.worker))
     if args.command == "list":
         return asyncio.run(_list())
     return asyncio.run(_revoke(args.key_id))

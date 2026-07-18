@@ -34,7 +34,7 @@ cp .env.example .env            # fill: POSTGRES_PASSWORD, R2 creds, webhook sec
 docker compose -f docker/docker-compose.yml up -d          # api + db + valkey
 docker compose -f docker/docker-compose.yml --profile dispatcher up -d  # if modal/hf_space
 # mint keys
-docker compose -f docker/docker-compose.yml exec api python -m sceneforge_api.keycli create --name worker
+docker compose -f docker/docker-compose.yml exec api python -m sceneforge_api.keycli create --name worker --worker
 docker compose -f docker/docker-compose.yml exec api python -m sceneforge_api.keycli create --name first-customer
 ```
 

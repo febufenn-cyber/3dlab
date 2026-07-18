@@ -197,6 +197,10 @@ def create_app(
         session=Depends(get_session),
         key: ApiKey = Depends(require_key),
     ):
+        if not key.is_worker:
+            # Customer keys must never be able to rewrite scene results —
+            # not even for their own scenes.
+            raise HTTPException(403, "Worker key required")
         scene = (
             await session.execute(select(Scene).where(Scene.id == scene_id))
         ).scalar_one_or_none()

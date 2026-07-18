@@ -177,14 +177,18 @@ def train_splat(
         else:
             loss = l1
 
+        # Ordering per gsplat's reference trainer (examples/simple_trainer.py
+        # @ v1.5.3): backward → optimizer steps → strategy.step_post_backward,
+        # with the CURRENT (decayed) means lr driving MCMC noise injection.
         strategy.step_pre_backward(params, optimizers, strategy_state, step, info)
         loss.backward()
-        strategy.step_post_backward(
-            params, optimizers, strategy_state, step, info, lr=lrs["means"]
-        )
         for opt in optimizers.values():
             opt.step()
             opt.zero_grad(set_to_none=True)
+        current_means_lr = optimizers["means"].param_groups[0]["lr"]
+        strategy.step_post_backward(
+            params, optimizers, strategy_state, step, info, lr=current_means_lr
+        )
         for group in optimizers["means"].param_groups:
             group["lr"] *= means_lr_decay
 
@@ -237,11 +241,31 @@ def train_splat(
     )
 
 
+def _find_ksplat_converter() -> Path | None:
+    """Locate viewer/tools/convert-to-ksplat.mjs.
+
+    The repo-relative path only works for editable installs; a pip-installed
+    package (worker image) lives in site-packages, so the image sets
+    SCENEFORGE_KSPLAT_TOOL to the absolute location instead.
+    """
+    import os
+
+    env = os.environ.get("SCENEFORGE_KSPLAT_TOOL")
+    candidates = [Path(env)] if env else []
+    candidates.append(
+        Path(__file__).resolve().parents[3] / "viewer" / "tools" / "convert-to-ksplat.mjs"
+    )
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
+
 def compress_splat(ply_path: Path, arrays: dict, out_dir: Path, cfg: SplatConfig) -> tuple[Path, str]:
     """Compress to .ksplat via the bundled node converter; fall back to .splat."""
     node = shutil.which("node")
-    converter = Path(__file__).resolve().parents[3] / "viewer" / "tools" / "convert-to-ksplat.mjs"
-    if cfg.export_format == "ksplat" and node and converter.exists():
+    converter = _find_ksplat_converter()
+    if cfg.export_format == "ksplat" and node and converter is not None:
         ksplat = out_dir / "scene.ksplat"
         proc = subprocess.run(
             [node, str(converter), str(ply_path), str(ksplat)],

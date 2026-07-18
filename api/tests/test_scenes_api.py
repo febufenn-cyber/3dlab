@@ -65,7 +65,7 @@ async def test_happy_path_states(api):
 
     # Worker: processing → succeeded with results.
     r = await client.post(
-        f"/v1/scenes/{sid}/_result", json={"state": "processing"}, headers=ctx["headers"]
+        f"/v1/scenes/{sid}/_result", json={"state": "processing"}, headers=ctx["worker_headers"]
     )
     assert r.status_code == 200
     r = await client.get(f"/v1/scenes/{sid}", headers=ctx["headers"])
@@ -80,7 +80,7 @@ async def test_happy_path_states(api):
             "semantic": semantic,
             "assets": {"splat": f"{sid}/assets/scene.ksplat"},
         },
-        headers=ctx["headers"],
+        headers=ctx["worker_headers"],
     )
     assert r.status_code == 200
 
@@ -118,7 +118,7 @@ async def test_honest_failure_path(api):
                 },
             },
         },
-        headers=ctx["headers"],
+        headers=ctx["worker_headers"],
     )
     assert r.status_code == 200
 
@@ -147,6 +147,18 @@ async def test_tenant_isolation(api):
 
     r = await client.get(f"/v1/scenes/{sid}", headers={"Authorization": f"Bearer {plain}"})
     assert r.status_code == 404
+
+
+async def test_customer_key_cannot_post_results(api):
+    """Regression: the _result callback must reject non-worker keys — a
+    customer must never rewrite scene state, even for their own scene."""
+    client, ctx = api
+    data = await _create_scene(client, ctx)
+    sid = data["scene_id"]
+    r = await client.post(
+        f"/v1/scenes/{sid}/_result", json={"state": "succeeded"}, headers=ctx["headers"]
+    )
+    assert r.status_code == 403
 
 
 async def test_unknown_scene_404(api):
