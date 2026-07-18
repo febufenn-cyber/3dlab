@@ -35,6 +35,15 @@ class GeometryConfig:
     min_registered_ratio: float = 0.55  # registered / extracted-kept
     colmap_bin: str = "colmap"
     glomap_bin: str = "glomap"
+    # lingbot-map feed-forward backend (opt-in `--backend lingbot`; see
+    # LICENSES.md — code Apache-2.0, weights license inferred/unverified).
+    lingbot_python: str = "python"
+    lingbot_module: str = "lingbot_map.inference"
+    lingbot_model_path: str = "/opt/lingbot-map/weights"
+    lingbot_mode: str = "streaming"     # streaming | windowed
+    lingbot_use_sdpa: bool = False      # set True on GPUs without FlashInfer (e.g. T4/SM75)
+    lingbot_conf_threshold: float = 0.5
+    lingbot_max_points: int = 200_000
 
 
 @dataclass(frozen=True)

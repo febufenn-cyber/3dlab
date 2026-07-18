@@ -49,6 +49,15 @@ RUN python3.11 -m venv /opt/venv
 RUN pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cu124
 RUN pip install gsplat==1.5.3 transformers==5.14.1 accelerate
 
+# Optional: the feed-forward lingbot-map geometry backend (`--backend lingbot`).
+# Not installed by default — it is opt-in and its weights license is still to
+# be confirmed (LICENSES.md). To enable, pin a commit + fetch the weights and
+# set GeometryConfig.lingbot_model_path, e.g.:
+#   RUN pip install "git+https://github.com/Robbyant/lingbot-map@<PINNED_SHA>"
+#   RUN python -m lingbot_map.download --out /opt/lingbot-map/weights   # verify weights license first
+# lingbot needs torch 2.8 / CUDA 12.8 and FlashInfer (or --use_sdpa on SM75/T4);
+# run it in its own image/venv if that conflicts with the pinned torch above.
+
 COPY pipeline /app/pipeline
 COPY api/sceneforge_api /app/api/sceneforge_api
 COPY api/sceneforge_worker /app/api/sceneforge_worker

@@ -28,6 +28,8 @@ jobs:
         run: python -m pytest api/tests -q
       - name: Frozen schema self-check
         run: rf-scene schema > /dev/null
+      - name: Validate design sheets against STANDARD.md
+        run: python tools/validate.py designs
 
   viewer-build:
     runs-on: ubuntu-latest

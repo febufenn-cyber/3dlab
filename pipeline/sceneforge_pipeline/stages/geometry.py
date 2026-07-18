@@ -1,12 +1,17 @@
 """Stage 2 — geometry: frames → camera poses + point cloud (brief §4.2).
 
-Default commercial-safe backend: COLMAP (BSD-3) feature extraction/matching
-+ GLOMAP (BSD-3) global mapper. Both are invoked as external binaries (they
-live in the GPU worker image; see api/docker/Dockerfile.worker).
+Backends behind one `GeometryBackend` interface (identical contract, so a
+default swap is one line):
 
-Research-only backends (CC-BY-NC family — see LICENSES.md) are registered but
-refuse to run unless the pipeline was started with --research. The interface
-is identical so a future license change is a one-line default swap.
+* `colmap_glomap` — **default, commercial-safe.** COLMAP (BSD-3) feature
+  extraction/matching + global SfM mapping. Invoked as external binaries in
+  the GPU worker image (api/docker/Dockerfile.worker).
+* `lingbot` — feed-forward streaming SfM (Robbyant/Ant Group; poses+cloud in
+  one pass). Code Apache-2.0; weights license inferred-permissive and flagged
+  (LICENSES.md / DECISIONS.md D29). Opt-in via `--backend lingbot`; see
+  stages/lingbot.py for the output→ColmapModel conversion.
+* `research_feedforward` — DUSt3R/MASt3R/VGGT class (CC-BY-NC). Registered but
+  refuses to run without --research.
 """
 
 from __future__ import annotations
@@ -198,8 +203,45 @@ class ResearchOnlyBackend(GeometryBackend):
         )
 
 
+class LingbotMapBackend(GeometryBackend):
+    """lingbot-map (Robbyant/Ant Group) feed-forward streaming SfM.
+
+    Poses + dense point cloud in one forward pass — far under the GPU budget
+    versus incremental SfM. CODE is Apache-2.0 (verified); model WEIGHTS carry
+    no separate license on the repo and the HF card is unreachable from this
+    build's proxy, so the weights license is recorded as *inferred* Apache-2.0
+    and flagged for direct confirmation (see LICENSES.md / DECISIONS.md D28).
+    Because that is unresolved, this backend is NOT the default — COLMAP is —
+    but it is fully selectable via `--backend lingbot`. The heavy lifting (the
+    output→ColmapModel conversion) is pure and unit-tested; only inference
+    needs the GPU. See stages/lingbot.py.
+    """
+
+    name = "lingbot"
+    commercial_safe = True  # code Apache-2.0; weights inferred-permissive, see LICENSES.md
+
+    def reconstruct(self, frames_dir: Path, workdir: Path, cfg: GeometryConfig) -> GeometryResult:
+        from .lingbot import lingbot_to_colmap_model, run_lingbot_inference
+
+        frame_names = [p.name for p in sorted(frames_dir.glob("*.jpg"))]
+        output = run_lingbot_inference(frames_dir, workdir, cfg)
+        model = lingbot_to_colmap_model(
+            output,
+            conf_threshold=cfg.lingbot_conf_threshold,
+            max_points=cfg.lingbot_max_points,
+            frame_names=frame_names,
+        )
+        return summarize_model(
+            model,
+            total_input=len(frame_names),
+            cfg=cfg,
+            extra={"backend": self.name},
+        )
+
+
 _BACKENDS: dict[str, type[GeometryBackend]] = {
     ColmapGlomapBackend.name: ColmapGlomapBackend,
+    LingbotMapBackend.name: LingbotMapBackend,
     ResearchOnlyBackend.name: ResearchOnlyBackend,
 }
 

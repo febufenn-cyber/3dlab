@@ -41,7 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--known-dimension", type=float, default=None, metavar="METERS",
         help="fallback scale: the longest side of the largest room, in meters",
     )
-    b.add_argument("--backend", default=None, help="geometry backend override")
+    b.add_argument(
+        "--backend", default=None,
+        choices=["colmap_glomap", "lingbot", "research_feedforward"],
+        help="geometry backend (default colmap_glomap; 'lingbot' is feed-forward — "
+             "see LICENSES.md on its weights license)",
+    )
     b.add_argument(
         "--skip-splat", action="store_true",
         help="stop after semantics/floorplan (no GPU needed; for debugging)",

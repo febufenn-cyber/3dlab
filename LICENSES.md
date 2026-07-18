@@ -10,13 +10,19 @@ be used in a commercial deployment.
 Verification notes: this environment's egress proxy blocks `huggingface.co`
 and `modal.com` directly; those rows were verified via the projects' canonical
 GitHub sources and search-indexed copies of the model cards, as noted. Re-verify
-those two directly before a production launch.
+those two directly before a production launch. **lingbot-map weights** are a
+sharper case: unlike OWLv2 (whose upstream states verbatim that code *and*
+checkpoints are Apache-2.0), lingbot-map's README declares the *project*
+Apache-2.0 but does not separately name the weights, and its HF card tag could
+not be fetched here — so the weights row is marked *inferred*, not observed,
+and lingbot is kept off the default path until confirmed (COLMAP is default).
 
 ## Commercial path (default) — all permissive
 
 | Component | Use | License | Commercial-safe | Version pinned | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| COLMAP (+pycolmap) | SfM features/matching, undistort, global mapper (≥4.1) | BSD-3-Clause | ✅ | 4.1.0 | [COPYING.txt](https://github.com/colmap/colmap/blob/main/COPYING.txt) |
+| COLMAP (+pycolmap) | SfM features/matching, undistort, global mapper (≥4.1) — **default** geometry backend | BSD-3-Clause | ✅ | 4.1.0 | [COPYING.txt](https://github.com/colmap/colmap/blob/main/COPYING.txt) |
+| lingbot-map (Robbyant / Ant Group) | feed-forward streaming geometry backend (opt-in `--backend lingbot`) | **code** Apache-2.0 (verified from README); **weights** license *inferred* Apache-2.0 — repo declares no separate weights license and the HF card is proxy-blocked in this env, so **confirm directly before commercial use** | ⚠️ code ✅ / weights unverified | commit-pinned at deploy | [repo](https://github.com/Robbyant/lingbot-map) · [HF weights](https://huggingface.co/robbyant/lingbot-map) |
 | GLOMAP (legacy fallback) | global SfM (final release; repo **archived 2026-03-09**, merged into COLMAP 4.1) | BSD-3-Clause | ✅ | 1.2.0 | [LICENSE](https://github.com/colmap/glomap/blob/main/LICENSE) |
 | gsplat | 3DGS training/rasterization | Apache-2.0 | ✅ | 1.5.3 | [LICENSE](https://github.com/nerfstudio-project/gsplat/blob/main/LICENSE) |
 | GaussianSplats3D | web splat viewer + .ksplat converter (maintenance mode since 2025; MIT stands) | MIT | ✅ | 0.4.7 | [LICENSE](https://github.com/mkkellogg/GaussianSplats3D/blob/main/LICENSE) |

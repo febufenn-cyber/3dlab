@@ -10,6 +10,7 @@
 | Date / revision | 2026-07-17 · **Rev A** |
 | Status | Implemented (CPU-verifiable scope); GPU acceptance pending hardware (QUALITY.md) |
 | Provenance rule | every external-tool claim here is verified in LICENSES.md from the linked primary source, checked 2026-07-17 |
+| Relation to the Drawing House standard | `STANDARD.md` (rev C) is now in the repo; the per-phase design sheets that satisfy it live at `designs/phase1-cli` (**DO-012**), `designs/phase2-api` (**DO-013**), `designs/phase3-viewer` (**DO-014**) and pass `tools/validate.py` (run in CI). This page is the one-page cross-index over them and the as-built record; the DO sheets are the authoritative per-phase drawings. |
 
 ## 2. Assembly drawing (system at one glance)
 
@@ -45,6 +46,7 @@ Key line items: COLMAP 4.1.0 (BSD-3, includes global mapper — GLOMAP merged/ar
 gsplat 1.5.3 (Apache-2.0), OWLv2 base-patch16-ensemble (Apache-2.0 incl. weights),
 GaussianSplats3D 0.4.7 + three 0.170.0 (MIT), FastAPI/pydantic/SQLAlchemy/arq (MIT/BSD),
 Valkey 8 (BSD-3), Postgres 16, ffmpeg (LGPL, subprocess-only), numpy/scipy/shapely/OpenCV.
+Opt-in geometry backend: lingbot-map (Robbyant/Ant Group; code Apache-2.0, weights license inferred — see LICENSES.md D29), feed-forward alternative to COLMAP, `--backend lingbot`.
 Research-gated (never default): DUSt3R/MASt3R (CC-BY-NC-SA), VGGT (custom Meta license).
 Excluded: SpatialLM (no commercially-safe variant), Redis 8 server, Ultralytics, svgwrite.
 

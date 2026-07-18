@@ -5,10 +5,13 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **90 automated tests green** (65 pipeline + 25 API), covering:
+- **100 automated tests green** (75 pipeline + 25 API), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
-  - COLMAP binary model I/O round-trip,
+  - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
+  - lingbot-map → ColmapModel conversion: c2w→w2c pose inversion recovers
+    known camera centers, confidence filtering, colour sampling, non-finite
+    drop, point cap, and backend registration/selectability,
   - blur/duplicate curation and both ingest quality gates,
   - registration quality gate + research-license gating,
   - door-prior scale math (synthetic pinhole scene recovers scale exactly;

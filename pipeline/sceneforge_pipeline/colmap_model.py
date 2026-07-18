@@ -104,6 +104,31 @@ def qvec2rotmat(q: np.ndarray) -> np.ndarray:
     )
 
 
+def rotmat2qvec(R: np.ndarray) -> np.ndarray:
+    """Rotation matrix → (w, x, y, z) quaternion (COLMAP convention).
+
+    Inverse of qvec2rotmat; uses the standard eigenvalue formulation COLMAP
+    ships (scripts/python/read_write_model.py, BSD-3) so round-trips are exact.
+    """
+    Rxx, Ryx, Rzx, Rxy, Ryy, Rzy, Rxz, Ryz, Rzz = R.flat
+    K = (
+        np.array(
+            [
+                [Rxx - Ryy - Rzz, 0, 0, 0],
+                [Ryx + Rxy, Ryy - Rxx - Rzz, 0, 0],
+                [Rzx + Rxz, Rzy + Ryz, Rzz - Rxx - Ryy, 0],
+                [Ryz - Rzy, Rzx - Rxz, Rxy - Ryx, Rxx + Ryy + Rzz],
+            ]
+        )
+        / 3.0
+    )
+    eigvals, eigvecs = np.linalg.eigh(K)
+    qvec = eigvecs[[3, 0, 1, 2], np.argmax(eigvals)]
+    if qvec[0] < 0:
+        qvec = -qvec
+    return qvec
+
+
 def _read(fid, fmt: str) -> tuple:
     fmt = "<" + fmt  # little-endian, packed (no native alignment padding)
     size = struct.calcsize(fmt)
