@@ -26,6 +26,8 @@ out/
 *.ply
 *.splat
 *.ksplat
+# The demo's synthetic sample scene IS committed (viewer/tools/make-sample-scene.py)
+!viewer/demo/sample/*.ksplat
 *.spz
 scenes/
 workdir/

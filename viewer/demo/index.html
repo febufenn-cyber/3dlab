@@ -19,6 +19,8 @@
     src="./sample/scene.ksplat"
     poster="./sample/poster.png"
     mode="walk"
+    camera-position="0.7,0.6,1.5"
+    look-at="2.5,1.8,1.0"
     height="480px"&gt;&lt;/rf-walkthrough&gt;</pre>
 
 <script src="../dist/rf.js"></script>
@@ -26,15 +28,19 @@
     src="./sample/scene.ksplat"
     poster="./sample/poster.png"
     mode="walk"
+    camera-position="0.7,0.6,1.5"
+    look-at="2.5,1.8,1.0"
     height="480px"></rf-walkthrough>
 
 <p class="note">
-  Serve this folder over HTTP (<code>python -m http.server</code> from
-  <code>viewer/</code>) and drop a real scene's <code>scene.ksplat</code> +
-  <code>poster.png</code> into <code>viewer/demo/sample/</code> — the output of
-  <code>rf-scene build video.mp4 -o out/</code> works as-is. Until then the tile
-  shows an honest load error instead of a fake scene: SceneForge never invents
-  geometry, including here.
+  The bundled sample is a <strong>procedurally generated synthetic room</strong>
+  (<code>viewer/tools/make-sample-scene.py</code>) — not a real capture, and
+  labeled as such on the poster too: SceneForge never passes generated content
+  off as a reconstruction. A real captured scene lands here after the first GPU
+  run (see <code>QUALITY.md</code>); the output of
+  <code>rf-scene build video.mp4 -o out/</code> drops into
+  <code>viewer/demo/sample/</code> as-is. Serve this folder over HTTP
+  (<code>python -m http.server</code> from <code>viewer/</code>).
 </p>
 </body>
 </html>

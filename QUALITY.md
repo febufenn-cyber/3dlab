@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **79 automated tests green** (62 pipeline + 17 API), covering:
+- **90 automated tests green** (65 pipeline + 25 API), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip,
@@ -22,6 +22,12 @@ Evidence for what works, and an honest ledger of what is not yet proven.
   - **integration: our PLY → GaussianSplats3D `convert-to-ksplat` → `.ksplat`
     loads back in the real loader with the correct splat count** (validates the
     exact byte layout the viewer consumes),
+  - **real-ffmpeg ingest integration** (ffmpeg 6.1): a genuine synthesized
+    25 s video → 75 frames at 3 fps, long-side cap honored without upscaling,
+    blurry/static capture rejected with the right `reason_code`,
+  - worker job flow (`run_job.process_scene`): processing→succeeded posts, the
+    frozen asset-key mapping (`scene.ksplat`→`scene` etc.), video-extension
+    probing, crash → `failed`/`worker_crash`, honest-failure pass-through,
   - API: auth, tenant isolation (404 across keys), full state machine, honest
     failure path (short clip → `failed` + `capture_rule`), webhook HMAC +
     firing rules, path-traversal guard, BuildJob/BuildOutcome round-trips.
