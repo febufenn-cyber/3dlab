@@ -1,0 +1,86 @@
+# SceneForge control plane — sized for the OCI Always-Free Ampere A1 VM
+# (ARM64; every image here is multi-arch). The GPU worker is NOT here: it is a
+# separate x86 CUDA host running Dockerfile.worker (or the modal/hf_space
+# dispatchers, which can run on this VM via the `dispatcher` profile).
+#
+#   cp .env.example .env   # fill in secrets (never commit .env)
+#   docker compose up -d
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SCENEFORGE_DATABASE_URL: postgresql+asyncpg://sceneforge:${POSTGRES_PASSWORD}@db:5432/sceneforge
+      SCENEFORGE_REDIS_URL: redis://queue:6379
+      SCENEFORGE_STORAGE: ${SCENEFORGE_STORAGE:-s3}
+      SCENEFORGE_S3_BUCKET: ${SCENEFORGE_S3_BUCKET:-}
+      SCENEFORGE_S3_ENDPOINT: ${SCENEFORGE_S3_ENDPOINT:-}
+      SCENEFORGE_PUBLIC_ASSET_BASE: ${SCENEFORGE_PUBLIC_ASSET_BASE:-}
+      SCENEFORGE_WEBHOOK_SECRET: ${SCENEFORGE_WEBHOOK_SECRET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      queue:
+        condition: service_started
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sceneforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sceneforge
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sceneforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Valkey (BSD-3) — Redis-protocol server without the Redis 8 licensing
+  # question marks; arq speaks to it unchanged. See LICENSES.md.
+  queue:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - queuedata:/data
+
+  # Optional: CPU-side dispatcher for serverless GPU adapters (modal/hf_space).
+  # Not needed when the GPU box runs the arq worker itself (local adapter).
+  dispatcher:
+    profiles: ["dispatcher"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["arq", "sceneforge_worker.arq_worker.WorkerSettings"]
+    environment:
+      SCENEFORGE_REDIS_URL: redis://queue:6379
+      SCENEFORGE_API_BASE: http://api:8000
+      SCENEFORGE_WORKER_API_KEY: ${SCENEFORGE_WORKER_API_KEY:-}
+      SCENEFORGE_GPU_WORKER: ${SCENEFORGE_GPU_WORKER:-modal}
+      SCENEFORGE_STORAGE: ${SCENEFORGE_STORAGE:-s3}
+      SCENEFORGE_S3_BUCKET: ${SCENEFORGE_S3_BUCKET:-}
+      SCENEFORGE_S3_ENDPOINT: ${SCENEFORGE_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      MODAL_TOKEN_ID: ${MODAL_TOKEN_ID:-}
+      MODAL_TOKEN_SECRET: ${MODAL_TOKEN_SECRET:-}
+      SCENEFORGE_HF_SPACE: ${SCENEFORGE_HF_SPACE:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+    depends_on:
+      - queue
+      - api
+
+volumes:
+  pgdata:
+  queuedata:

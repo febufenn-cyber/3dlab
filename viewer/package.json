@@ -1,0 +1,18 @@
+{
+  "name": "@sceneforge/viewer",
+  "version": "0.1.0",
+  "description": "Embeddable <rf-walkthrough> web component for SceneForge Gaussian-splat scenes",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "convert": "node tools/convert-to-ksplat.mjs"
+  },
+  "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "0.4.7",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

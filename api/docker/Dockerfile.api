@@ -1,0 +1,14 @@
+# SceneForge API — CPU-only, ARM-safe (runs on the OCI Always-Free Ampere A1).
+# Build context is api/ (see docker-compose.yml).
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+COPY pyproject.toml ./
+COPY sceneforge_api ./sceneforge_api
+COPY sceneforge_worker ./sceneforge_worker
+RUN pip install ".[prod]"
+
+EXPOSE 8000
+CMD ["uvicorn", "sceneforge_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

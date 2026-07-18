@@ -1,0 +1,53 @@
+# Publish the viewer demo + rf.js to GitHub Pages (free static hosting per
+# the zero-cost constraint). Runs on main; requires Pages to be enabled once
+# in repo Settings → Pages → Source: GitHub Actions (see docs/RUNBOOK.md).
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - name: Build rf.js
+        working-directory: viewer
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp -r viewer/demo site/demo
+          cp -r viewer/dist site/dist
+          cat > site/index.html <<'EOF'
+          <!DOCTYPE html><html><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=demo/">
+          <title>SceneForge demo</title></head>
+          <body><a href="demo/">SceneForge viewer demo</a></body></html>
+          EOF
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

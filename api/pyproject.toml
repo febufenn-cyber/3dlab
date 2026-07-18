@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sceneforge-api"
+version = "0.1.0"
+description = "SceneForge API service + GPU worker dispatch"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "pydantic>=2.9,<3",
+    "sqlalchemy[asyncio]>=2.0.30,<3",
+    "aiosqlite>=0.20",          # dev/test DB; prod uses asyncpg
+    "httpx>=0.27,<1",
+    "arq>=0.26,<1",
+]
+
+[project.optional-dependencies]
+prod = [
+    "asyncpg>=0.29",
+    "boto3>=1.34",
+]
+modal = ["modal>=1.0"]
+hf = ["gradio_client>=1.3"]
+dev = [
+    "pytest>=8",
+    "fakeredis>=2.23",
+]
+
+[tool.setuptools.packages.find]
+include = ["sceneforge_api*", "sceneforge_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

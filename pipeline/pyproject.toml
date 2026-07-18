@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sceneforge-pipeline"
+version = "0.1.0"
+description = "SceneForge engine: phone video walkthrough → Gaussian splat + semantic scene JSON + floor plan"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    # CPU core — every stage except splat training runs with just these.
+    "numpy>=2.1,<3",
+    "opencv-python-headless>=4.10,<6",
+    "scipy>=1.14,<2",
+    "shapely>=2.0,<3",
+    "pydantic>=2.9,<3",
+]
+
+[project.optional-dependencies]
+# GPU worker image extras — pinned in api/docker/Dockerfile.worker where the
+# CUDA build matrix is controlled; loose here so a dev box can pip install.
+gpu = [
+    "torch>=2.4",
+    "gsplat>=1.4,<2",
+    "transformers>=4.45",
+]
+dev = [
+    "pytest>=8",
+    "jsonschema>=4.23",
+]
+
+[project.scripts]
+rf-scene = "sceneforge_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sceneforge_pipeline*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
