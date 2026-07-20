@@ -36,6 +36,19 @@ class Settings:
     )
     max_upload_mb: int = field(default_factory=lambda: int(_env("SCENEFORGE_MAX_UPLOAD_MB", "500")))
     webhook_secret: str = field(default_factory=lambda: _env("SCENEFORGE_WEBHOOK_SECRET", ""))
+    # Reliability reaper (reaper.py): scenes stuck in `processing` longer than
+    # processing_timeout_s are failed honestly (worker_timeout); scenes sitting
+    # in `queued` longer than queued_timeout_s are re-enqueued (heals lost
+    # enqueues / queue restarts). interval 0 disables the loop (tests).
+    processing_timeout_s: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_PROCESSING_TIMEOUT_S", "3600"))
+    )
+    queued_timeout_s: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_QUEUED_TIMEOUT_S", "1800"))
+    )
+    reaper_interval_s: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_REAPER_INTERVAL_S", "300"))
+    )
 
 
 def get_settings() -> Settings:

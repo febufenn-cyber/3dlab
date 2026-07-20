@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **100 automated tests green** (75 pipeline + 25 API), covering:
+- **114 automated tests green** (75 pipeline + 36 API + 3 real-browser E2E), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
@@ -33,7 +33,16 @@ Evidence for what works, and an honest ledger of what is not yet proven.
     probing, crash → `failed`/`worker_crash`, honest-failure pass-through,
   - API: auth, tenant isolation (404 across keys), full state machine, honest
     failure path (short clip → `failed` + `capture_rule`), webhook HMAC +
-    firing rules, path-traversal guard, BuildJob/BuildOutcome round-trips.
+    firing rules, path-traversal guard, BuildJob/BuildOutcome round-trips,
+  - **reliability gauntlet**: double-confirm races enqueue exactly once,
+    queue outages never lose a scene, the reaper fails stuck `processing`
+    scenes honestly (+ webhook) and re-enqueues stale `queued` once per
+    window, requeue endpoint state-gated and tenant-isolated, zombie-worker
+    reports can't regress terminal states but real late results beat timeouts,
+  - **real-browser E2E** (Playwright + headless Chromium, in CI): the shipped
+    `rf.js` + sample scene load end-to-end to a rendering WebGL canvas —
+    element upgrade, poster gate, .ksplat parse, GaussianSplats3D boot, walk
+    mode; component load stalls surface `rf-error` within a bounded timeout.
 
 ## Pending hardware (cannot be produced in this workspace — no GPU, no camera)
 

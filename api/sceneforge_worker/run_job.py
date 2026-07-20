@@ -31,12 +31,29 @@ def _api_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {WORKER_API_KEY}"}
 
 
-async def _post_result(scene_id: str, payload: dict) -> None:
+async def _post_result(scene_id: str, payload: dict, retries: int = 3) -> None:
+    """Report to the API with retries — a blip in the control plane must not
+    turn a finished GPU job into a lost result."""
+    import asyncio
+
+    last_exc: Exception | None = None
     async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.post(
-            f"{API_BASE}/v1/scenes/{scene_id}/_result", json=payload, headers=_api_headers()
-        )
-        r.raise_for_status()
+        for attempt in range(retries):
+            try:
+                r = await client.post(
+                    f"{API_BASE}/v1/scenes/{scene_id}/_result",
+                    json=payload, headers=_api_headers(),
+                )
+                r.raise_for_status()
+                return
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code < 500:
+                    raise  # 4xx is a contract problem, retrying won't help
+                last_exc = e
+            except httpx.HTTPError as e:
+                last_exc = e
+            await asyncio.sleep(2 ** attempt)
+    raise last_exc  # type: ignore[misc]
 
 
 async def process_scene(ctx: dict, scene_id: str) -> str:

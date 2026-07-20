@@ -20,6 +20,7 @@ async def api(tmp_path):
         database_url=f"sqlite+aiosqlite:///{tmp_path}/test.db",
         storage_backend="local",
         local_storage_dir=str(tmp_path / "storage"),
+        reaper_interval_s=0,  # tests drive reap_once directly
     )
     database = Database(settings.database_url)
     queue = InMemoryQueue()

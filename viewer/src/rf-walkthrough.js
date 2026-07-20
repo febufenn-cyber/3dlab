@@ -15,6 +15,8 @@
  *              after the user taps, or when `autoload` is set)
  *   height     CSS height of the widget (default 420px)
  *   mode       "orbit" (default) or "walk" (WASD + arrows/drag)
+ *   load-timeout  seconds before an unresponsive load surfaces rf-error
+ *                 instead of an infinite spinner (default 120)
  *
  * Design notes: sharedMemoryForWorkers is off so host pages don't need
  * COOP/COEP headers; Z-up matches the SceneForge scene frame.
@@ -135,10 +137,20 @@ class RfWalkthrough extends HTMLElement {
         sharedMemoryForWorkers: false,   // host pages keep working without COOP/COEP
         antialiased: false,              // cheaper on mid-range mobile GPUs
       });
-      await this._viewer.addSplatScene(url, {
-        progressiveLoad: true,
-        showLoadingUI: true,
-      });
+      // Bounded load: a stalled fetch or broken GPU must surface rf-error,
+      // never an infinite spinner.
+      const timeoutS = Number(this.getAttribute('load-timeout')) > 0
+        ? Number(this.getAttribute('load-timeout')) : 120;
+      await Promise.race([
+        this._viewer.addSplatScene(url, {
+          progressiveLoad: true,
+          showLoadingUI: true,
+        }),
+        new Promise((_, reject) => setTimeout(
+          () => reject(new Error(`scene did not load within ${timeoutS}s`)),
+          timeoutS * 1000
+        )),
+      ]);
       this._viewer.start();
       poster.remove();
       this._setupModes();
