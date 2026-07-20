@@ -5,6 +5,7 @@
 | Piece | Where | Free-tier reality (verified, see notes) |
 | --- | --- | --- |
 | API + Postgres + Valkey | OCI Always-Free Ampere A1 VM | **2 OCPU / 12 GB RAM** (1,500 OCPU-hrs + 9,000 GB-hrs/mo — HALVED from 4/24 on 2026-06-15 with no announcement; brief's figure is stale). 200 GB block volume, 10 TB egress. Watch for silent limit changes; existing over-limit instances were stopped by Oracle. |
+| — or the micro profile | OCI Always-Free **E2.1.Micro** (×2 per tenancy) | **1 GB RAM / ⅛ AMD OCPU / 50 Mbps**, x86_64 — enough because the control plane only shuffles JSON (presigned URLs carry all bytes). SQLite+capped-Valkey compose: `docker/docker-compose.micro.yml`, full walkthrough in [DEPLOY_E2_MICRO.md](DEPLOY_E2_MICRO.md). Same file scales to A1 unchanged (more users, same $0); A1 capacity is also often unavailable in popular regions — E2 rarely is. |
 | Splat/asset storage | Cloudflare R2 | 10 GB-mo storage, 1 M class-A + 10 M class-B ops/mo, **zero egress** — ~400 scenes at 25 MB before paying $0.015/GB-mo |
 | Viewer CDN (`rf.js`) + demo | GitHub Pages | free for public repos. Zero setup: `.github/workflows/pages.yml` pushes the built site to the `gh-pages` branch on every push to main, which auto-enables Pages in deploy-from-branch mode — no settings toggle needed. Site: `https://<owner>.github.io/<repo>/` |
 | GPU (choose per env `SCENEFORGE_GPU_WORKER`) | see below | no always-free GPU exists anywhere — adapters below |

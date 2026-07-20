@@ -1,0 +1,102 @@
+# SceneForge control plane — MICRO profile, sized for the OCI Always-Free
+# VM.Standard.E2.1.Micro (1 GB RAM, 1/8 AMD OCPU burstable, x86_64, 50 Mbps).
+#
+# Why 1 GB is enough: the control plane never touches video/splat bytes
+# (browser ↔ R2 via presigned URLs) and never runs pipeline compute (GPU
+# stages run on Modal / a local CUDA box / the agent's browser). This box
+# only shuffles JSON. Differences vs docker-compose.yml:
+#   * SQLite instead of Postgres (~150 MB + a container saved; supported
+#     out of the box via SCENEFORGE_DATABASE_URL)
+#   * Valkey capped at 48 MB with noeviction (a queue must never drop jobs)
+#   * per-service memory limits so one leak can't OOM the host
+#   * optional cloudflared profile for zero-config TLS (hides the IP too)
+#
+# The SAME file runs unchanged on the bigger A1 shape — same $0/month, more
+# concurrent users; raise/remove mem_limits there. Full walkthrough:
+# docs/DEPLOY_E2_MICRO.md.
+#
+#   cp .env.example .env   # fill R2 creds + secrets; POSTGRES_* not needed
+#   docker compose -f docker/docker-compose.micro.yml up -d
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    mem_limit: 320m
+    environment:
+      SCENEFORGE_DATABASE_URL: sqlite+aiosqlite:////data/sceneforge.db
+      SCENEFORGE_REDIS_URL: redis://queue:6379
+      SCENEFORGE_STORAGE: ${SCENEFORGE_STORAGE:-s3}
+      SCENEFORGE_S3_BUCKET: ${SCENEFORGE_S3_BUCKET:-}
+      SCENEFORGE_S3_ENDPOINT: ${SCENEFORGE_S3_ENDPOINT:-}
+      SCENEFORGE_PUBLIC_ASSET_BASE: ${SCENEFORGE_PUBLIC_ASSET_BASE:-}
+      SCENEFORGE_WEBHOOK_SECRET: ${SCENEFORGE_WEBHOOK_SECRET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - apidata:/data
+    depends_on:
+      - queue
+
+  # Valkey (BSD-3). noeviction: on memory pressure arq enqueues fail loudly
+  # instead of jobs vanishing silently — scenes stay in `queued` and can be
+  # re-enqueued, honest-failure over quiet data loss.
+  queue:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command:
+      ["valkey-server", "--appendonly", "yes",
+       "--maxmemory", "48mb", "--maxmemory-policy", "noeviction"]
+    mem_limit: 80m
+    volumes:
+      - queuedata:/data
+
+  # CPU-side dispatcher for serverless GPU adapters (modal/hf_space).
+  # Skip this profile when a local CUDA box runs the arq worker itself.
+  dispatcher:
+    profiles: ["dispatcher"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    command: ["arq", "sceneforge_worker.arq_worker.WorkerSettings"]
+    mem_limit: 280m
+    environment:
+      SCENEFORGE_REDIS_URL: redis://queue:6379
+      SCENEFORGE_API_BASE: http://api:8000
+      SCENEFORGE_WORKER_API_KEY: ${SCENEFORGE_WORKER_API_KEY:-}
+      SCENEFORGE_GPU_WORKER: ${SCENEFORGE_GPU_WORKER:-modal}
+      SCENEFORGE_STORAGE: ${SCENEFORGE_STORAGE:-s3}
+      SCENEFORGE_S3_BUCKET: ${SCENEFORGE_S3_BUCKET:-}
+      SCENEFORGE_S3_ENDPOINT: ${SCENEFORGE_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      MODAL_TOKEN_ID: ${MODAL_TOKEN_ID:-}
+      MODAL_TOKEN_SECRET: ${MODAL_TOKEN_SECRET:-}
+      SCENEFORGE_HF_SPACE: ${SCENEFORGE_HF_SPACE:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+    depends_on:
+      - queue
+      - api
+
+  # Zero-config TLS + stable hostname via Cloudflare Tunnel (free tier).
+  # Create the tunnel once in the Cloudflare dashboard, point it at
+  # http://api:8000, and put the token in .env as CLOUDFLARE_TUNNEL_TOKEN.
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    mem_limit: 80m
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - api
+
+volumes:
+  apidata:
+  queuedata:
