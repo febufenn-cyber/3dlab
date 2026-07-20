@@ -32,15 +32,25 @@ from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, HttpUrl
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from .db import ApiKey, Database, Scene, find_key, new_scene_id, utcnow
 from .queue import make_queue
 from .reaper import reaper_loop
 from .scene_views import SceneStatusResponse, status_response
+from .security import BodyLimitMiddleware, RateLimiter
 from .settings import Settings, get_settings
 from .storage import LocalStorage, make_storage
 from .webhooks import deliver
+
+# Uploads never traverse the API (presigned direct-to-R2), so only safe video
+# container types are accepted for the STORED object's Content-Type — this
+# prevents a tenant from having their upload served back as text/html etc.
+_ALLOWED_CONTENT_TYPES = {
+    "video/mp4", "video/quicktime", "video/webm", "video/x-matroska",
+    "video/x-m4v", "video/3gpp", "application/octet-stream",
+}
+_NON_TERMINAL_STATES = ("awaiting_upload", "queued", "processing")
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +61,9 @@ log = logging.getLogger(__name__)
 class SceneCreateRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=200, description="e.g. flat.mp4")
     content_type: str = Field(default="video/mp4", max_length=100)
-    webhook_url: Optional[HttpUrl] = None
+    webhook_url: Optional[HttpUrl] = Field(default=None)
+    # webhook_url is validated to http(s) at delivery time by the SSRF guard
+    # (webhooks.is_url_allowed) and bounded by HttpUrl parsing here.
 
 
 class SceneCreateResponse(BaseModel):
@@ -108,6 +120,10 @@ def create_app(
         await database.dispose()
 
     app = FastAPI(title="SceneForge API", version="1.0", lifespan=lifespan)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_kb * 1024)
+    create_limiter = RateLimiter(
+        capacity=settings.create_rate_capacity, refill_per_sec=settings.create_rate_per_sec
+    )
     app.state.settings = settings
     app.state.database = database
     app.state.queue = queue
@@ -139,11 +155,36 @@ def create_app(
         session=Depends(get_session),
         key: ApiKey = Depends(require_key),
     ):
+        # Per-key rate limit (token bucket) — cheap flood control.
+        if not create_limiter.allow(key.id):
+            raise HTTPException(429, "Rate limit exceeded; slow down scene creation")
+        # Per-key cap on outstanding non-terminal scenes — bounds row growth
+        # and presigned-URL generation from a single (possibly leaked) key.
+        outstanding = (
+            await session.execute(
+                select(func.count())
+                .select_from(Scene)
+                .where(Scene.api_key_id == key.id, Scene.state.in_(_NON_TERMINAL_STATES))
+            )
+        ).scalar_one()
+        if outstanding >= settings.max_outstanding_scenes:
+            raise HTTPException(
+                429,
+                f"Too many in-flight scenes ({outstanding}); finish or let them "
+                "expire before creating more",
+            )
+        # Only safe video container types can become the stored object's
+        # Content-Type; anything else is coerced to an inert octet-stream.
+        content_type = (
+            body.content_type
+            if body.content_type in _ALLOWED_CONTENT_TYPES
+            else "application/octet-stream"
+        )
         scene_id = new_scene_id()
         ext = "".join(c for c in body.filename.rsplit(".", 1)[-1].lower() if c.isalnum())[:5] or "mp4"
         video_key = f"{scene_id}/video.{ext}"
         upload_url = storage.presign_upload(
-            video_key, body.content_type, settings.presign_expiry_s
+            video_key, content_type, settings.presign_expiry_s
         )
         scene = Scene(
             id=scene_id,

@@ -49,6 +49,24 @@ class Settings:
     reaper_interval_s: int = field(
         default_factory=lambda: int(_env("SCENEFORGE_REAPER_INTERVAL_S", "300"))
     )
+    reaper_batch: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_REAPER_BATCH", "500"))
+    )
+    # Edge security (security.py). Body cap: the API only ever receives small
+    # JSON (uploads go direct to R2), so a few MB is generous and stops the
+    # unauthenticated large-body OOM. Rate limit + outstanding cap are per-key.
+    max_request_body_kb: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_MAX_REQUEST_BODY_KB", "4096"))
+    )
+    create_rate_capacity: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_CREATE_RATE_CAPACITY", "60"))
+    )
+    create_rate_per_sec: float = field(
+        default_factory=lambda: float(_env("SCENEFORGE_CREATE_RATE_PER_SEC", "1.0"))
+    )
+    max_outstanding_scenes: int = field(
+        default_factory=lambda: int(_env("SCENEFORGE_MAX_OUTSTANDING_SCENES", "100"))
+    )
 
 
 def get_settings() -> Settings:
