@@ -84,6 +84,12 @@ class BodyLimitMiddleware:
 
 
 async def _reject_413(send: Send) -> None:
+    try:
+        from .observability import metrics
+
+        metrics.rejections.inc(kind="body_too_large")
+    except Exception:
+        pass
     await send(
         {
             "type": "http.response.start",

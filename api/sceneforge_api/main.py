@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import func, select, update
 
 from .db import ApiKey, Database, Scene, find_key, new_scene_id, utcnow
+from .observability import MetricsMiddleware, configure_logging, metrics
 from .queue import make_queue
 from .reaper import reaper_loop
 from .scene_views import SceneStatusResponse, status_response
@@ -99,6 +100,7 @@ def create_app(
     storage=None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging(settings.log_format, settings.log_level)
     database = database or Database(settings.database_url)
     queue = queue if queue is not None else make_queue(settings.redis_url)
     storage = storage or make_storage(settings)
@@ -120,7 +122,10 @@ def create_app(
         await database.dispose()
 
     app = FastAPI(title="SceneForge API", version="1.0", lifespan=lifespan)
+    # Order: MetricsMiddleware added last ⇒ outermost, so it times and counts
+    # everything including body-limit 413s. BodyLimit stays inner.
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_kb * 1024)
+    app.add_middleware(MetricsMiddleware)
     create_limiter = RateLimiter(
         capacity=settings.create_rate_capacity, refill_per_sec=settings.create_rate_per_sec
     )
@@ -147,7 +152,63 @@ def create_app(
 
     @app.get("/healthz")
     async def healthz():
+        """Liveness: cheap, always-ok. Uptime monitors hit this."""
         return {"ok": True, "service": "sceneforge-api"}
+
+    @app.get("/readyz")
+    async def readyz(response: Response):
+        """Readiness: actually probes the DB (and queue if configured). Returns
+        503 with per-component booleans when a dependency is down so an
+        orchestrator/monitor can tell 'process alive' from 'can serve'."""
+        components: dict[str, bool] = {}
+        try:
+            async with database.sessionmaker() as session:
+                await session.execute(select(1))
+            components["database"] = True
+        except Exception:
+            log.warning("readyz: database check failed", exc_info=True)
+            components["database"] = False
+        # Queue: only assert readiness for a real broker; the in-memory/dev
+        # queue is always "ready". A ping method is optional.
+        ping = getattr(queue, "ping", None)
+        if ping is not None:
+            try:
+                await ping()
+                components["queue"] = True
+            except Exception:
+                log.warning("readyz: queue check failed", exc_info=True)
+                components["queue"] = False
+        ready = all(components.values())
+        if not ready:
+            response.status_code = 503
+        return {"ready": ready, "components": components}
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint(
+        response: Response, authorization: str = Header(default=""), token: str = "",
+    ):
+        """Prometheus exposition. Token-gated: with no SCENEFORGE_METRICS_TOKEN
+        configured it 404s (metrics disabled), so scene/tenant counts are never
+        exposed by default. Scrapers pass the token as a bearer or ?token=."""
+        if not settings.metrics_token:
+            raise HTTPException(404, "Not found")
+        supplied = authorization.removeprefix("Bearer ").strip() or token
+        if supplied != settings.metrics_token:
+            raise HTTPException(401, "Invalid metrics token")
+        # Refresh scene-state gauges at scrape time (pull, so no drift).
+        try:
+            async with database.sessionmaker() as session:
+                rows = (
+                    await session.execute(
+                        select(Scene.state, func.count()).group_by(Scene.state)
+                    )
+                ).all()
+            seen = {state: n for state, n in rows}
+            for state in ("awaiting_upload", "queued", "processing", "succeeded", "failed"):
+                metrics.scenes_by_state.set(float(seen.get(state, 0)), state=state)
+        except Exception:
+            log.warning("metrics: scene-state refresh failed", exc_info=True)
+        return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
 
     @app.post("/v1/scenes", response_model=SceneCreateResponse, status_code=201)
     async def create_scene(
@@ -157,6 +218,7 @@ def create_app(
     ):
         # Per-key rate limit (token bucket) — cheap flood control.
         if not create_limiter.allow(key.id):
+            metrics.rejections.inc(kind="rate_limit")
             raise HTTPException(429, "Rate limit exceeded; slow down scene creation")
         # Per-key cap on outstanding non-terminal scenes — bounds row growth
         # and presigned-URL generation from a single (possibly leaked) key.
@@ -168,6 +230,7 @@ def create_app(
             )
         ).scalar_one()
         if outstanding >= settings.max_outstanding_scenes:
+            metrics.rejections.inc(kind="outstanding_cap")
             raise HTTPException(
                 429,
                 f"Too many in-flight scenes ({outstanding}); finish or let them "
@@ -313,6 +376,7 @@ def create_app(
             scene.assets = body.assets
         scene.error_code = body.error_code
         await session.commit()
+        metrics.worker_results.inc(state=body.state)
         if body.state in ("succeeded", "failed") and scene.webhook_url:
             payload = {
                 "event": f"scene.{body.state}",

@@ -55,6 +55,7 @@ def is_url_allowed(url: str) -> bool:
 async def deliver(url: str, payload: dict, secret: str = "", retries: int = 3) -> bool:
     if not is_url_allowed(url):
         log.warning("webhook %s blocked by SSRF guard (non-global address or bad scheme)", url)
+        _record_delivery("blocked_ssrf")
         return False
     body = json.dumps(payload, separators=(",", ":")).encode()
     headers = {"Content-Type": "application/json", "User-Agent": "sceneforge-webhook/1"}
@@ -65,9 +66,20 @@ async def deliver(url: str, payload: dict, secret: str = "", retries: int = 3) -
             try:
                 resp = await client.post(url, content=body, headers=headers)
                 if resp.status_code < 300:
+                    _record_delivery("success")
                     return True
                 log.warning("webhook %s → HTTP %s (attempt %d)", url, resp.status_code, attempt + 1)
             except httpx.HTTPError as e:
                 log.warning("webhook %s failed: %s (attempt %d)", url, e, attempt + 1)
             await asyncio.sleep(2 ** attempt)
+    _record_delivery("failed")
     return False
+
+
+def _record_delivery(result: str) -> None:
+    try:
+        from .observability import metrics
+
+        metrics.webhook_deliveries.inc(result=result)
+    except Exception:
+        pass

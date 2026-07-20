@@ -53,6 +53,11 @@ class ArqQueue(JobQueue):
             raise RuntimeError(f"arq refused to enqueue scene {scene_id}")
         log.info("enqueued %s", scene_id)
 
+    async def ping(self) -> None:
+        """Readiness probe: raises if the broker is unreachable (used by /readyz)."""
+        pool = await self._get_pool()
+        await pool.ping()
+
     async def close(self) -> None:
         if self._pool is not None:
             await self._pool.aclose()

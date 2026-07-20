@@ -26,6 +26,9 @@ async def _build_api(tmp_path, **settings_overrides):
         reaper_interval_s=0,  # tests drive reap_once directly
         **settings_overrides,
     )
+    from sceneforge_api.observability import metrics
+
+    metrics.reset()  # module-level singleton — isolate metric state per test
     database = Database(settings.database_url)
     queue = InMemoryQueue()
     storage = LocalStorage(tmp_path / "storage")

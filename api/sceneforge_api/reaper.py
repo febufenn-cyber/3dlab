@@ -143,6 +143,14 @@ async def reap_once(
             log.warning("reaper: webhook delivery to %s failed permanently", url)
 
     if timed_out or requeue_ids or expired_uploads:
+        try:
+            from .observability import metrics
+
+            metrics.reaper_actions.inc(len(timed_out), kind="processing_timeout")
+            metrics.reaper_actions.inc(len(requeue_ids), kind="requeued")
+            metrics.reaper_actions.inc(len(expired_uploads), kind="upload_abandoned")
+        except Exception:
+            pass
         log.info(
             "reaper: failed %d stuck processing %s; re-enqueued %d stale queued %s; "
             "expired %d abandoned uploads %s",
