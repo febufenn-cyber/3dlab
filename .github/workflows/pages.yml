@@ -1,6 +1,9 @@
 # Publish the viewer demo + rf.js to GitHub Pages (free static hosting per
-# the zero-cost constraint). Runs on main; requires Pages to be enabled once
-# in repo Settings → Pages → Source: GitHub Actions (see docs/RUNBOOK.md).
+# the zero-cost constraint). Publishes by pushing the built site to the
+# `gh-pages` branch — creating that branch auto-enables Pages in
+# deploy-from-branch mode on public repos, so no one ever has to touch repo
+# settings (the previous deploy-pages-API mechanism 404'd until a manual
+# Settings → Pages toggle; see docs/RUNBOOK.md).
 name: pages
 
 on:
@@ -9,9 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write   # push to gh-pages
 
 concurrency:
   group: pages
@@ -20,9 +21,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,14 +38,23 @@ jobs:
           mkdir -p site
           cp -r viewer/demo site/demo
           cp -r viewer/dist site/dist
+          touch site/.nojekyll
           cat > site/index.html <<'EOF'
           <!DOCTYPE html><html><head><meta charset="utf-8">
           <meta http-equiv="refresh" content="0; url=demo/">
           <title>SceneForge demo</title></head>
           <body><a href="demo/">SceneForge viewer demo</a></body></html>
           EOF
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages
+        run: |
+          cd site
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy site from ${GITHUB_SHA}"
+          git push --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages:refs/heads/gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
