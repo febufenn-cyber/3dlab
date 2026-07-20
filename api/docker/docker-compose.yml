@@ -22,8 +22,16 @@ services:
       SCENEFORGE_S3_ENDPOINT: ${SCENEFORGE_S3_ENDPOINT:-}
       SCENEFORGE_PUBLIC_ASSET_BASE: ${SCENEFORGE_PUBLIC_ASSET_BASE:-}
       SCENEFORGE_WEBHOOK_SECRET: ${SCENEFORGE_WEBHOOK_SECRET:-}
+      SCENEFORGE_METRICS_TOKEN: ${SCENEFORGE_METRICS_TOKEN:-}
+      SCENEFORGE_LOG_FORMAT: ${SCENEFORGE_LOG_FORMAT:-json}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/readyz').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       db:
         condition: service_healthy

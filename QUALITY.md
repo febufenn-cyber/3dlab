@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **124 automated tests green** (75 pipeline + 46 API + 3 real-browser E2E), covering:
+- **136 automated tests green** (75 pipeline + 58 API + 3 real-browser E2E), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
@@ -47,6 +47,12 @@ Evidence for what works, and an honest ledger of what is not yet proven.
     ~300 MB-POST OOM is 413'd reading zero body bytes (proven), per-key rate
     limit + outstanding-scene cap fire, reaper batches its queries and expires
     abandoned uploads, hostile `content_type` coerced to octet-stream.
+  - **observability** (`docs/OPS.md`): Prometheus registry renders valid
+    exposition (cumulative histogram buckets, label escaping), `/metrics`
+    token-gated (404 disabled / 401 wrong token) with scene-state gauges
+    refreshed from the DB at scrape, `/readyz` 200-with-components / 503 on
+    DB-down, `X-Request-ID` on every response, JSON logs carry the request id,
+    edge rejections + reaper/webhook/worker events counted.
 
 ## Pending hardware (cannot be produced in this workspace — no GPU, no camera)
 

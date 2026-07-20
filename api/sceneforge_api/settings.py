@@ -67,6 +67,12 @@ class Settings:
     max_outstanding_scenes: int = field(
         default_factory=lambda: int(_env("SCENEFORGE_MAX_OUTSTANDING_SCENES", "100"))
     )
+    # Observability (observability.py). log_format json|text; metrics_token
+    # gates /metrics (empty ⇒ /metrics returns 404, i.e. metrics disabled by
+    # default so scene/tenant counts aren't publicly exposed).
+    log_format: str = field(default_factory=lambda: _env("SCENEFORGE_LOG_FORMAT", "json"))
+    log_level: str = field(default_factory=lambda: _env("SCENEFORGE_LOG_LEVEL", "INFO"))
+    metrics_token: str = field(default_factory=lambda: _env("SCENEFORGE_METRICS_TOKEN", ""))
 
 
 def get_settings() -> Settings:
