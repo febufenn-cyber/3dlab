@@ -3,9 +3,19 @@
 Endpoints:
   POST /v1/scenes                  → scene id + presigned upload URL
   POST /v1/scenes/{id}/uploaded    → confirm upload, enqueue processing
+  POST /v1/scenes/{id}/requeue     → re-run a failed scene
   GET  /v1/scenes/{id}             → state + quality report + asset URLs
   GET  /v1/scenes/{id}/semantic    → the semantic JSON document
   GET  /healthz
+
+Reliability invariants (enforced here + by reaper.py):
+  * state transitions are ATOMIC (guarded UPDATE ... WHERE state=...), so a
+    double /uploaded or concurrent requeue can never double-enqueue;
+  * an enqueue failure never 500s a confirmed upload — the scene stays
+    `queued` and the reaper re-enqueues it;
+  * no scene sits in `processing`/`queued` forever (reaper timeouts);
+  * a late `processing` report can't regress a terminal scene (409), but a
+    late TERMINAL report always wins — a real result beats a timeout.
 Dev-only (local storage backend): PUT /v1/_local-upload/{key},
 GET /v1/_local-download/{key}.
 
@@ -15,16 +25,19 @@ Auth: `Authorization: Bearer sk_...` (hashed keys in Postgres, minted with
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, HttpUrl
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from .db import ApiKey, Database, Scene, find_key, new_scene_id
+from .db import ApiKey, Database, Scene, find_key, new_scene_id, utcnow
 from .queue import make_queue
+from .reaper import reaper_loop
+from .scene_views import SceneStatusResponse, status_response
 from .settings import Settings, get_settings
 from .storage import LocalStorage, make_storage
 from .webhooks import deliver
@@ -47,16 +60,6 @@ class SceneCreateResponse(BaseModel):
     upload_url: str
     upload_expires_s: int
     next: str = "PUT the video to upload_url, then POST /v1/scenes/{scene_id}/uploaded"
-
-
-class SceneStatusResponse(BaseModel):
-    scene_id: str
-    state: str
-    quality_report: Optional[dict[str, Any]] = None
-    assets: Optional[dict[str, Any]] = None
-    error_code: Optional[str] = None
-    created_at: str
-    updated_at: str
 
 
 class WorkerResult(BaseModel):
@@ -91,7 +94,16 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await database.create_all()
+        reaper_stop = asyncio.Event()
+        reaper_task = None
+        if settings.reaper_interval_s > 0:
+            reaper_task = asyncio.create_task(
+                reaper_loop(database.sessionmaker, queue, storage, settings, reaper_stop)
+            )
         yield
+        if reaper_task is not None:
+            reaper_stop.set()
+            await reaper_task
         await queue.close()
         await database.dispose()
 
@@ -158,6 +170,27 @@ def create_app(
             raise HTTPException(404, "Scene not found")
         return scene
 
+    async def _atomic_transition(session, scene_id: str, from_state: str, **values) -> bool:
+        """Guarded UPDATE … WHERE state=from_state; True iff this call won the race."""
+        result = await session.execute(
+            update(Scene)
+            .where(Scene.id == scene_id, Scene.state == from_state)
+            .values(updated_at=utcnow(), **values)
+        )
+        await session.commit()
+        return result.rowcount == 1
+
+    async def _enqueue_resilient(scene_id: str) -> None:
+        """An enqueue failure must never 500 a committed `queued` transition —
+        the scene is durably queued in the DB and the reaper re-enqueues it."""
+        try:
+            await queue.enqueue(scene_id)
+        except Exception:
+            log.warning(
+                "enqueue of %s failed (queue down?); scene stays queued — "
+                "the reaper will re-enqueue it", scene_id, exc_info=True,
+            )
+
     @app.post("/v1/scenes/{scene_id}/uploaded", response_model=SceneStatusResponse)
     async def confirm_upload(
         scene_id: str, session=Depends(get_session), key: ApiKey = Depends(require_key)
@@ -167,17 +200,36 @@ def create_app(
             raise HTTPException(409, f"Scene is {scene.state}, not awaiting_upload")
         if not storage.exists(scene.video_key):
             raise HTTPException(400, "Video not found in storage — upload it first")
-        scene.state = "queued"
-        await session.commit()
-        await queue.enqueue(scene_id)
-        return _status_response(scene)
+        if not await _atomic_transition(session, scene_id, "awaiting_upload", state="queued"):
+            raise HTTPException(409, "Scene is no longer awaiting_upload")
+        await _enqueue_resilient(scene_id)
+        await session.refresh(scene)
+        return status_response(scene, storage)
+
+    @app.post("/v1/scenes/{scene_id}/requeue", response_model=SceneStatusResponse)
+    async def requeue_scene(
+        scene_id: str, session=Depends(get_session), key: ApiKey = Depends(require_key)
+    ):
+        """Re-run a FAILED scene (e.g. after worker_timeout or a re-shoot-free
+        transient failure). Only `failed` is requeueable: succeeded scenes are
+        final, and in-flight states are owned by the worker/reaper."""
+        scene = await _get_owned_scene(scene_id, session, key)
+        if not await _atomic_transition(
+            session, scene_id, "failed", state="queued", error_code=None
+        ):
+            raise HTTPException(
+                409, f"Scene is {scene.state}; only failed scenes can be requeued"
+            )
+        await _enqueue_resilient(scene_id)
+        await session.refresh(scene)
+        return status_response(scene, storage)
 
     @app.get("/v1/scenes/{scene_id}", response_model=SceneStatusResponse)
     async def get_scene(
         scene_id: str, session=Depends(get_session), key: ApiKey = Depends(require_key)
     ):
         scene = await _get_owned_scene(scene_id, session, key)
-        return _status_response(scene)
+        return status_response(scene, storage)
 
     @app.get("/v1/scenes/{scene_id}/semantic")
     async def get_semantic(
@@ -206,6 +258,11 @@ def create_app(
         ).scalar_one_or_none()
         if scene is None:
             raise HTTPException(404, "Scene not found")
+        if body.state == "processing" and scene.state in ("succeeded", "failed"):
+            # A late 'processing' heartbeat must not regress a terminal scene
+            # (e.g. after the reaper timed it out). A late TERMINAL result is
+            # still accepted below — a real outcome beats a timeout.
+            raise HTTPException(409, f"Scene already terminal ({scene.state})")
         scene.state = body.state
         if body.quality_report is not None:
             scene.quality_report = body.quality_report
@@ -218,7 +275,7 @@ def create_app(
         if body.state in ("succeeded", "failed") and scene.webhook_url:
             payload = {
                 "event": f"scene.{body.state}",
-                "scene": _status_response(scene).model_dump(mode="json"),
+                "scene": status_response(scene, storage).model_dump(mode="json"),
             }
             ok = await deliver(scene.webhook_url, payload, settings.webhook_secret)
             if not ok:
@@ -250,23 +307,6 @@ def create_app(
                 )
             except ValueError:
                 raise HTTPException(400, "Bad key")
-
-    def _status_response(scene: Scene) -> SceneStatusResponse:
-        assets = None
-        if scene.assets:
-            assets = {
-                name: storage.public_url(key) if not str(key).startswith("http") else key
-                for name, key in scene.assets.items()
-            }
-        return SceneStatusResponse(
-            scene_id=scene.id,
-            state=scene.state,
-            quality_report=scene.quality_report,
-            assets=assets,
-            error_code=scene.error_code,
-            created_at=scene.created_at.isoformat(),
-            updated_at=scene.updated_at.isoformat(),
-        )
 
     return app
 

@@ -31,6 +31,20 @@ jobs:
       - name: Validate design sheets against STANDARD.md
         run: python tools/validate.py designs
 
+  viewer-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Playwright + Chromium
+        run: |
+          pip install pytest playwright
+          playwright install chromium --with-deps
+      - name: Real-browser viewer E2E (rf.js + sample scene in headless Chromium)
+        run: python -m pytest viewer/tests/test_viewer_e2e.py -q
+
   viewer-build:
     runs-on: ubuntu-latest
     steps:

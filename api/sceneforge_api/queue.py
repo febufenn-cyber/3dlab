@@ -38,8 +38,19 @@ class ArqQueue(JobQueue):
         return self._pool
 
     async def enqueue(self, scene_id: str) -> None:
+        import uuid
+
         pool = await self._get_pool()
-        await pool.enqueue_job(JOB_NAME, scene_id, _job_id=f"job:{scene_id}")
+        # Unique job ids: a deterministic id would make requeue-after-failure a
+        # silent no-op while arq keeps the previous job's result (keep_result).
+        # Double-processing safety lives in the DB state machine instead
+        # (atomic transitions in main.py) — a duplicate job wastes GPU minutes
+        # at worst, never corrupts state.
+        job = await pool.enqueue_job(
+            JOB_NAME, scene_id, _job_id=f"job:{scene_id}:{uuid.uuid4().hex[:8]}"
+        )
+        if job is None:  # can't happen with unique ids; fail loudly if it does
+            raise RuntimeError(f"arq refused to enqueue scene {scene_id}")
         log.info("enqueued %s", scene_id)
 
     async def close(self) -> None:

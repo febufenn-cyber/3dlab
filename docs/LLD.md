@@ -79,7 +79,7 @@ Excluded: SpatialLM (no commercially-safe variant), Redis 8 server, Ultralytics,
 | Phase | Deliverable | Acceptance | Status |
 | --- | --- | --- | --- |
 | 1 — engine CLI | `rf-scene build video.mp4 -o out/` → splat + semantic.json + floorplan.svg + quality_report.json + viewer.html | 60–90 s 1080p video end-to-end ≤ 20 min on T4; splat ≤ 25 MB; floor plan matches; dims ±10 % vs tape measure | code + 65 CPU tests done; **GPU acceptance pending hardware** (QUALITY.md protocol written) |
-| 2 — API | POST/GET /v1/scenes, webhook, keys, compose (ARM) + worker image (x86 CUDA) | happy path + honest-failure path (10 s clip → `failed`/insufficient coverage) | done; 25 tests incl. both paths |
+| 2 — API | POST/GET /v1/scenes, webhook, keys, compose (ARM) + worker image (x86 CUDA) | happy path + honest-failure path (10 s clip → `failed`/insufficient coverage) | done; 36 tests incl. both paths + reliability gauntlet |
 | 3 — viewer + quickstart | rf.js web component, demo page, ≤10-line integration | smooth on mid-range Android, sane 4G payload | component + 720 KB bundle done; device test pending hardware |
 
 ## 7. Revision history
