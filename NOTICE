@@ -1,0 +1,33 @@
+SceneForge
+Copyright 2026 SceneForge contributors
+
+This product bundles or invokes third-party open-source components. Their
+licenses are cataloged in LICENSES.md (every entry verified from a primary
+source). The commercial default path uses only permissive licenses
+(Apache-2.0 / MIT / BSD-family).
+
+Attribution required by the Apache License 2.0 (§4d) for redistributed
+components — reproduced here, and their LICENSE/NOTICE files bundled in the
+GPU worker image (api/docker/Dockerfile.worker):
+
+  lingbot-map — feed-forward 3D geometry model (default geometry backend)
+    Copyright Robbyant / Ant Group
+    Licensed under the Apache License, Version 2.0
+    https://github.com/Robbyant/lingbot-map  (LICENSE.txt: Apache-2.0)
+    Used unmodified, invoked as a subprocess. "LingBot", "Robbyant" and
+    "Ant Group" are marks of their owners; this project is not endorsed by
+    or affiliated with them.
+
+  gsplat — Gaussian-splat training/rasterization
+    Copyright 2025 Nerfstudio Team — Apache License, Version 2.0
+    https://github.com/nerfstudio-project/gsplat
+
+  OWLv2 (google/owlv2-base-patch16-ensemble) via HuggingFace transformers
+    Apache License, Version 2.0
+
+  COLMAP — Structure-from-Motion (classical fallback backend)
+    Copyright ETH Zurich and UNC Chapel Hill — BSD-3-Clause
+
+A full copy of the Apache License 2.0 is available at
+https://www.apache.org/licenses/LICENSE-2.0 and is bundled with each
+Apache-2.0 component in the deployed images.

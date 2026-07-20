@@ -167,13 +167,18 @@ def build_scene(
             from .stages.splat import train_splat, undistort  # lazy: torch/gsplat
 
             with _timed("splat"):
-                model_dir = Path(geo.stats["model_dir"])
-                und_images, und_sparse = undistort(
-                    ing.frames_dir, model_dir, workdir, cfg.geometry.colmap_bin
-                )
-                from .colmap_model import read_model
+                if geo.already_undistorted:
+                    # Feed-forward backends (lingbot) emit an ideal pinhole model;
+                    # the original frames are used as-is, no COLMAP undistortion.
+                    und_images, und_model = ing.frames_dir, geo.model
+                else:
+                    model_dir = Path(geo.stats["model_dir"])
+                    und_images, und_sparse = undistort(
+                        ing.frames_dir, model_dir, workdir, cfg.geometry.colmap_bin
+                    )
+                    from .colmap_model import read_model
 
-                und_model = read_model(und_sparse)
+                    und_model = read_model(und_sparse)
                 sp = train_splat(
                     und_images, und_model, workdir, cfg.splat, out_dir,
                     world_transform=T_final,

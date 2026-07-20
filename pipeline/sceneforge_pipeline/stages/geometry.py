@@ -1,15 +1,16 @@
 """Stage 2 — geometry: frames → camera poses + point cloud (brief §4.2).
 
-Backends behind one `GeometryBackend` interface (identical contract, so a
-default swap is one line):
+Backends behind one `GeometryBackend` interface (identical contract, so the
+default is one line of config):
 
-* `colmap_glomap` — **default, commercial-safe.** COLMAP (BSD-3) feature
-  extraction/matching + global SfM mapping. Invoked as external binaries in
-  the GPU worker image (api/docker/Dockerfile.worker).
-* `lingbot` — feed-forward streaming SfM (Robbyant/Ant Group; poses+cloud in
-  one pass). Code Apache-2.0; weights license inferred-permissive and flagged
-  (LICENSES.md / DECISIONS.md D29). Opt-in via `--backend lingbot`; see
-  stages/lingbot.py for the output→ColmapModel conversion.
+* `lingbot` — **default, commercial-safe (Apache-2.0).** Feed-forward streaming
+  reconstruction (Robbyant/Ant Group; poses + cloud in one pass, ~20 fps) —
+  seconds not minutes, chosen for the GPU budget (D34). Fails honestly via a
+  point-confidence gate (a learned model never "fails to register"). See
+  stages/lingbot.py.
+* `colmap_glomap` — commercial-safe classical **fallback** (`--backend
+  colmap_glomap`). COLMAP (BSD-3) feature extraction/matching + global SfM.
+  Deterministic; fails honestly by failing to register a bad capture.
 * `research_feedforward` — DUSt3R/MASt3R/VGGT class (CC-BY-NC). Registered but
   refuses to run without --research.
 """
@@ -39,6 +40,10 @@ class GeometryResult:
     total_input: int
     mean_reproj_error: float
     stats: dict
+    # True when the backend's cameras are already an ideal pinhole model with
+    # the ORIGINAL frames usable as-is (lingbot). COLMAP needs a separate
+    # undistortion pass; lingbot does not — the pipeline branches on this.
+    already_undistorted: bool = False
 
 
 class GeometryBackend(abc.ABC):
@@ -204,38 +209,68 @@ class ResearchOnlyBackend(GeometryBackend):
 
 
 class LingbotMapBackend(GeometryBackend):
-    """lingbot-map (Robbyant/Ant Group) feed-forward streaming SfM.
+    """lingbot-map (Robbyant/Ant Group) feed-forward streaming SfM — **default**.
 
-    Poses + dense point cloud in one forward pass — far under the GPU budget
-    versus incremental SfM. CODE is Apache-2.0 (verified); model WEIGHTS carry
-    no separate license on the repo and the HF card is unreachable from this
-    build's proxy, so the weights license is recorded as *inferred* Apache-2.0
-    and flagged for direct confirmation (see LICENSES.md / DECISIONS.md D28).
-    Because that is unresolved, this backend is NOT the default — COLMAP is —
-    but it is fully selectable via `--backend lingbot`. The heavy lifting (the
-    output→ColmapModel conversion) is pure and unit-tested; only inference
-    needs the GPU. See stages/lingbot.py.
+    Poses + dense point cloud in one forward pass (~20 fps) — seconds not
+    minutes, the best fit for the ≤10 min GPU budget. Apache-2.0 (code verified
+    via the GitHub license API; weights corroborated + owner-confirmed — see
+    LICENSES.md / DECISIONS.md D34). COLMAP remains the classical fallback.
+
+    Honest-failure gate (`_apply_confidence_gate`): a learned model always emits
+    poses, so unlike SfM it never "fails to register" a bad capture. We instead
+    reject when too few world points clear the confidence threshold — keeping the
+    no-hallucination contract even with a feed-forward default. The
+    output→ColmapModel conversion is pure and unit-tested; only inference needs
+    the GPU. See stages/lingbot.py.
     """
 
     name = "lingbot"
-    commercial_safe = True  # code Apache-2.0; weights inferred-permissive, see LICENSES.md
+    commercial_safe = True  # Apache-2.0 (LICENSES.md, verified 2026-07-20)
 
     def reconstruct(self, frames_dir: Path, workdir: Path, cfg: GeometryConfig) -> GeometryResult:
-        from .lingbot import lingbot_to_colmap_model, run_lingbot_inference
+        from .lingbot import (
+            lingbot_confidence_stats,
+            lingbot_to_colmap_model,
+            run_lingbot_inference,
+        )
 
         frame_names = [p.name for p in sorted(frames_dir.glob("*.jpg"))]
         output = run_lingbot_inference(frames_dir, workdir, cfg)
+        conf_stats = lingbot_confidence_stats(output, cfg.lingbot_conf_threshold)
+        _apply_confidence_gate(conf_stats, cfg)  # fail loud before building the model
         model = lingbot_to_colmap_model(
             output,
             conf_threshold=cfg.lingbot_conf_threshold,
             max_points=cfg.lingbot_max_points,
             frame_names=frame_names,
         )
-        return summarize_model(
+        result = summarize_model(
             model,
             total_input=len(frame_names),
             cfg=cfg,
-            extra={"backend": self.name},
+            extra={"backend": self.name, **conf_stats},
+            skip_registration_gate=True,  # feed-forward: reg ratio is always 1.0
+        )
+        result.already_undistorted = True  # lingbot cameras are ideal pinhole
+        return result
+
+
+def _apply_confidence_gate(conf_stats: dict, cfg: GeometryConfig) -> None:
+    """Fail loud when the feed-forward reconstruction is too low-confidence to
+    trust — the learned-model equivalent of COLMAP's registration gate."""
+    if not conf_stats.get("has_confidence"):
+        log.warning("lingbot: no confidence channel in output; confidence gate skipped")
+        return
+    n_conf = conf_stats["n_confident"]
+    ratio = conf_stats["confident_ratio"]
+    if n_conf < cfg.lingbot_min_confident_points or ratio < cfg.lingbot_min_confident_ratio:
+        raise QualityGateError(
+            "insufficient_reconstruction_confidence",
+            f"lingbot reconstruction is too low-confidence: {n_conf} confident points "
+            f"({ratio:.0%} of total; need ≥ {cfg.lingbot_min_confident_points} and "
+            f"≥ {cfg.lingbot_min_confident_ratio:.0%}). The capture is likely too sparse, "
+            "blurry, or textureless — see docs/CAPTURE_GUIDE.md.",
+            {**conf_stats, "capture_rule": "slow_continuous_pan"},
         )
 
 
@@ -261,9 +296,14 @@ def get_backend(name: str, research: bool) -> GeometryBackend:
 
 
 def summarize_model(
-    model: ColmapModel, total_input: int, cfg: GeometryConfig, extra: dict | None = None
+    model: ColmapModel, total_input: int, cfg: GeometryConfig, extra: dict | None = None,
+    skip_registration_gate: bool = False,
 ) -> GeometryResult:
-    """Registration stats + the fail-fast gate on poor registration (brief §4.1/§6)."""
+    """Registration stats + the fail-fast gate on poor registration (brief §4.1/§6).
+
+    ``skip_registration_gate`` is set by feed-forward backends where every frame
+    is always "registered" (ratio 1.0) so that gate is meaningless — they gate
+    on confidence instead (see LingbotMapBackend)."""
     registered = len(model.images)
     errors = [p.error for p in model.points.values() if p.error >= 0]
     mean_err = float(np.mean(errors)) if errors else float("nan")
@@ -276,7 +316,9 @@ def summarize_model(
         "mean_reproj_error_px": round(mean_err, 3) if errors else None,
         **(extra or {}),
     }
-    if registered < cfg.min_registered_frames or ratio < cfg.min_registered_ratio:
+    if not skip_registration_gate and (
+        registered < cfg.min_registered_frames or ratio < cfg.min_registered_ratio
+    ):
         raise QualityGateError(
             "insufficient_registration",
             f"Only {registered}/{total_input} frames registered in SfM "
