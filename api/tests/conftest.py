@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -13,14 +15,16 @@ from sceneforge_api.settings import Settings
 from sceneforge_api.storage import LocalStorage
 
 
-@pytest_asyncio.fixture
-async def api(tmp_path):
-    """(client, ctx) — a fully wired app on SQLite + tmp local storage."""
+@contextlib.asynccontextmanager
+async def _build_api(tmp_path, **settings_overrides):
+    """Wire a fully-functional app; Settings is frozen, so per-test tuning goes
+    through overrides here rather than mutation."""
     settings = Settings(
         database_url=f"sqlite+aiosqlite:///{tmp_path}/test.db",
         storage_backend="local",
         local_storage_dir=str(tmp_path / "storage"),
         reaper_interval_s=0,  # tests drive reap_once directly
+        **settings_overrides,
     )
     database = Database(settings.database_url)
     queue = InMemoryQueue()
@@ -49,3 +53,21 @@ async def api(tmp_path):
         }
         yield client, ctx
     await database.dispose()
+
+
+@pytest_asyncio.fixture
+async def api(tmp_path):
+    """(client, ctx) — a fully wired app on SQLite + tmp local storage."""
+    async with _build_api(tmp_path) as pair:
+        yield pair
+
+
+@pytest.fixture
+def api_factory(tmp_path):
+    """Build an app with custom (frozen) Settings overrides:
+        async with api_factory(max_outstanding_scenes=3) as (client, ctx): ...
+    """
+    def _factory(**overrides):
+        return _build_api(tmp_path, **overrides)
+
+    return _factory

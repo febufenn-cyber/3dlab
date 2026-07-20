@@ -43,18 +43,24 @@ async def reap_once(
     now = now or utcnow()
     proc_cutoff = now - dt.timedelta(seconds=settings.processing_timeout_s)
     queued_cutoff = now - dt.timedelta(seconds=settings.queued_timeout_s)
+    # Abandoned uploads: the presigned URL is already dead, so a scene still in
+    # awaiting_upload past its expiry will never progress — expire it so these
+    # rows can't accumulate forever from a create-and-abandon flood.
+    upload_cutoff = now - dt.timedelta(seconds=settings.presign_expiry_s)
+    batch = max(1, settings.reaper_batch)
 
     timed_out: list[tuple[str, str | None]] = []  # (scene_id, webhook_url)
     webhook_payloads: list[tuple[str, dict]] = []
     requeue_ids: list[str] = []
+    expired_uploads: list[str] = []
 
     async with sessionmaker() as session:
         stuck = (
             (
                 await session.execute(
-                    select(Scene).where(
-                        Scene.state == "processing", Scene.updated_at < proc_cutoff
-                    )
+                    select(Scene)
+                    .where(Scene.state == "processing", Scene.updated_at < proc_cutoff)
+                    .limit(batch)
                 )
             )
             .scalars()
@@ -79,9 +85,9 @@ async def reap_once(
         stale = (
             (
                 await session.execute(
-                    select(Scene).where(
-                        Scene.state == "queued", Scene.updated_at < queued_cutoff
-                    )
+                    select(Scene)
+                    .where(Scene.state == "queued", Scene.updated_at < queued_cutoff)
+                    .limit(batch)
                 )
             )
             .scalars()
@@ -90,6 +96,25 @@ async def reap_once(
         for scene in stale:
             scene.updated_at = now  # rate-limits retries to one per timeout window
             requeue_ids.append(scene.id)
+
+        abandoned = (
+            (
+                await session.execute(
+                    select(Scene)
+                    .where(
+                        Scene.state == "awaiting_upload", Scene.updated_at < upload_cutoff
+                    )
+                    .limit(batch)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for scene in abandoned:
+            scene.state = "failed"
+            scene.error_code = "upload_abandoned"
+            scene.updated_at = now
+            expired_uploads.append(scene.id)
 
         await session.commit()
 
@@ -117,14 +142,17 @@ async def reap_once(
         if not ok:
             log.warning("reaper: webhook delivery to %s failed permanently", url)
 
-    if timed_out or requeue_ids:
+    if timed_out or requeue_ids or expired_uploads:
         log.info(
-            "reaper: failed %d stuck processing scene(s) %s; re-enqueued %d stale queued %s",
+            "reaper: failed %d stuck processing %s; re-enqueued %d stale queued %s; "
+            "expired %d abandoned uploads %s",
             len(timed_out), [s for s, _ in timed_out], len(requeue_ids), requeue_ids,
+            len(expired_uploads), expired_uploads,
         )
     return {
         "failed_processing": [s for s, _ in timed_out],
         "requeued": requeue_ids,
+        "expired_uploads": expired_uploads,
     }
 
 

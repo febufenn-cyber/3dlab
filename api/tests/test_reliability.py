@@ -229,7 +229,7 @@ async def test_reaper_leaves_fresh_scenes_alone(api):
     result = await reap_once(
         ctx["database"].sessionmaker, ctx["queue"], ctx["storage"], settings
     )
-    assert result == {"failed_processing": [], "requeued": []}
+    assert result == {"failed_processing": [], "requeued": [], "expired_uploads": []}
     r = await client.get(f"/v1/scenes/{sid}", headers=ctx["headers"])
     assert r.json()["state"] == "queued"
 

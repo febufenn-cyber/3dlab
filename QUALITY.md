@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **114 automated tests green** (75 pipeline + 36 API + 3 real-browser E2E), covering:
+- **124 automated tests green** (75 pipeline + 46 API + 3 real-browser E2E), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
@@ -43,6 +43,10 @@ Evidence for what works, and an honest ledger of what is not yet proven.
     `rf.js` + sample scene load end-to-end to a rendering WebGL canvas —
     element upgrade, poster gate, .ksplat parse, GaussianSplats3D boot, walk
     mode; component load stalls surface `rf-error` within a bounded timeout.
+  - **security regressions** (P2 red-team, `SECURITY.md`): the unauth
+    ~300 MB-POST OOM is 413'd reading zero body bytes (proven), per-key rate
+    limit + outstanding-scene cap fire, reaper batches its queries and expires
+    abandoned uploads, hostile `content_type` coerced to octet-stream.
 
 ## Pending hardware (cannot be produced in this workspace — no GPU, no camera)
 
