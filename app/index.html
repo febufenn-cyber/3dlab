@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SceneForge — video in, walkable 3D out</title>
+<meta name="description" content="Turn a 60–120 second phone video of an interior into a browser-native 3D walkthrough, a semantic scene JSON, and an auto floor plan.">
+<meta name="theme-color" content="#05060a">
+<meta property="og:title" content="SceneForge — video in, walkable 3D out">
+<meta property="og:description" content="A 60–120 s phone video becomes a browser-native 3D walkthrough, semantic scene JSON, and auto floor plan. Honest failure — never invented geometry.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://febufenn-cyber.github.io/3dlab/app/">
+<meta property="og:image" content="https://febufenn-cyber.github.io/3dlab/demo/sample/poster.png">
+<link rel="stylesheet" href="./assets/sf.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235e5ce6'/%3E%3Crect x='7' y='7' width='18' height='18' rx='5' fill='none' stroke='white' stroke-opacity='.9' stroke-width='2.4'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="sf-env" aria-hidden="true"></div>
+
+<!-- 2D experience: classic top navigation -->
+<nav class="sf-topnav sf-glass" aria-label="Primary">
+  <a class="sf-brand" href="#top"><span class="mark" aria-hidden="true"></span>SceneForge</a>
+  <a class="sf-nav-link" href="#scene">Scene</a>
+  <a class="sf-nav-link" href="#how">How it works</a>
+  <a class="sf-nav-link" href="#create">Create</a>
+  <a class="sf-nav-link" href="#embed-section">Embed</a>
+  <a class="sf-nav-link" href="./vision.html" title="Spatial layout with immersive VR (passthrough AR is on the roadmap)">Vision&nbsp;↗</a>
+</nav>
+
+<main class="sf-shell" id="top">
+
+  <!-- ======================= hero ======================= -->
+  <header class="sf-hero">
+    <p class="sf-eyebrow">Interior capture · Gaussian splatting</p>
+    <h1 class="sf-display">Film a room.<br>Walk through it anywhere.</h1>
+    <p class="sf-lede">SceneForge turns a 60–120&nbsp;second phone video into a browser-native
+      3D walkthrough — plus a semantic scene graph (rooms, walls, doors, objects, dimensions)
+      and an auto-drawn floor plan. No app install, no headset required — and a spatial
+      experience when you have one.</p>
+    <div class="sf-hero-cta">
+      <a class="sf-btn sf-btn--primary" href="#create">Create a scene</a>
+      <a class="sf-btn" href="#scene">See a live scene</a>
+    </div>
+    <div class="sf-hero-meta">
+      <span class="sf-chip"><span class="dot"></span>Runs in any modern browser</span>
+      <span class="sf-chip"><span class="dot"></span>Embeds with one tag</span>
+      <span class="sf-chip"><span class="dot"></span>Honest failure — never invented geometry</span>
+    </div>
+  </header>
+
+  <!-- ======================= live scene ======================= -->
+  <section id="scene" aria-label="Live sample scene">
+    <div class="sf-stage sf-glass sf-window sf-hoverable">
+      <rf-walkthrough
+          src="../demo/sample/scene.ksplat"
+          poster="../demo/sample/poster.png"
+          mode="walk"
+          camera-position="0.7,0.6,1.5"
+          look-at="2.5,1.8,1.0"
+          height="min(62vh, 560px)"></rf-walkthrough>
+      <div class="sf-stage-bar">
+        <span class="sf-chip" role="status" data-sf-viewer-status><span class="dot"></span>Tap the poster to load the scene</span>
+        <span class="hint"><span class="sf-kbd">W</span> <span class="sf-kbd">A</span>
+          <span class="sf-kbd">S</span> <span class="sf-kbd">D</span> walk ·
+          arrows turn · drag to look</span>
+      </div>
+    </div>
+
+    <!-- scene panel: plan / insights / embed live with the viewer -->
+    <div class="sf-section" style="margin-top:26px">
+      <div class="sf-glass sf-window" data-sf-tabs>
+        <div class="sf-tabs" role="tablist" aria-label="Scene outputs">
+          <button class="sf-tab" role="tab" id="tab-walk" aria-controls="panel-walk" aria-selected="true">About this scene</button>
+          <button class="sf-tab" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Floor plan</button>
+          <button class="sf-tab" role="tab" id="tab-insights" aria-controls="panel-insights" aria-selected="false" tabindex="-1">Insights</button>
+        </div>
+
+        <div class="sf-tabpanel" id="panel-walk" role="tabpanel" aria-labelledby="tab-walk">
+          <p class="sf-dim" style="max-width:70ch">This is the bundled <b>synthetic sample</b> — a
+            procedurally generated 4×3&nbsp;m room (labeled as such on its poster), so the demo works
+            before any GPU has run. The floor-plan tab is drawn by the pipeline's own SVG renderer;
+            the insights come from a ground-truth semantic document written from the generator's
+            constants (the format a real scene's extraction produces — not itself an extraction).
+            The first real capture replaces all of it after the first GPU acceptance run — see
+            <code>QUALITY.md</code>.</p>
+        </div>
+
+        <div class="sf-tabpanel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+          <div class="sf-plan">
+            <img src="../demo/sample/floorplan.svg" alt="Auto-generated floor plan of the sample room: a 4 by 3 meter rectangle with one door and a table" loading="lazy">
+          </div>
+          <p class="sf-faint" style="margin-top:12px">Drawn by <code>render_floorplan_svg</code> —
+            the identical code path a real scene uses. Dimensions carry a stated tolerance; plans
+            are estimates, never survey-grade.</p>
+        </div>
+
+        <div class="sf-tabpanel" id="panel-insights" role="tabpanel" aria-labelledby="tab-insights" hidden>
+          <div data-sf-insights></div>
+          <p class="sf-faint" style="margin-top:14px">From <code>semantic.json</code> — the frozen
+            schema&nbsp;1.0 contract your code consumes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= how it works ======================= -->
+  <section id="how" class="sf-section" aria-label="How it works">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Pipeline</p>
+      <h2>One video in. Three artifacts out.</h2>
+      <p class="sf-dim">Upload goes straight to storage over a presigned URL — the control plane
+        only ever moves JSON. A GPU worker picks the job up and reports honest state back —
+        including failure, with the exact reason.</p>
+    </div>
+    <div class="sf-grid sf-grid--3">
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">🎥</div>
+        <h3>Capture &amp; check</h3>
+        <p>Frames are extracted, blur- and coverage-gated. A capture that can't reconstruct is
+          rejected up front with a reason code and re-shoot guidance — not silently "fixed."</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">📐</div>
+        <h3>Feed-forward geometry</h3>
+        <p>lingbot-map (Apache-2.0) is built to recover camera poses and world points in one
+          forward pass — seconds-scale by design, with measured timings due from the first GPU
+          acceptance run. Classical COLMAP remains the verified fallback; a confidence gate keeps
+          failures honest.</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">✨</div>
+        <h3>Walkable splat</h3>
+        <p>gsplat MCMC training under a hard size budget → a compact <code>.ksplat</code> that
+          streams progressively, sized for mid-range phones (frame-rate acceptance is part of the
+          pending hardware run).</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">🧠</div>
+        <h3>Scene understanding</h3>
+        <p>Rooms, walls, door and window openings, object boxes — open-vocabulary detection plus
+          occupancy-grid geometry, in one frozen JSON contract.</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">📏</div>
+        <h3>Metric scale, stated honestly</h3>
+        <p>Scale comes from door priors, your known dimension, or camera height — each with a
+          confidence and a tolerance the UI must show. No fake precision.</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">🗺️</div>
+        <h3>Auto floor plan</h3>
+        <p>An SVG plan with room areas and a scale bar, drawn from the semantic graph — ready for
+          listings, handovers, and quotes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= create ======================= -->
+  <section id="create" class="sf-section" aria-label="Create a scene">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Create</p>
+      <h2>Drop a walkthrough video.</h2>
+      <p class="sf-dim">60–120&nbsp;seconds, 1080p, slow steady pans — the
+        <a href="https://github.com/febufenn-cyber/3dlab/blob/main/docs/CAPTURE_GUIDE.md" style="color:var(--sf-cyan)">capture guide</a>
+        shows the moves that reconstruct well.</p>
+    </div>
+
+    <div class="sf-grid sf-grid--2" data-sf-upload>
+      <div class="sf-glass sf-window">
+        <div class="sf-drop" role="button" tabindex="0"
+             aria-label="Drop your video here, or press Enter to choose a file">
+          <input type="file" accept="video/mp4,video/quicktime,video/webm">
+          <p style="font-size:34px" aria-hidden="true">⬆️</p>
+          <p style="margin-top:6px;font:600 17px/1.3 var(--sf-font)">Drop your video here</p>
+          <p class="sf-faint" style="margin-top:8px">MP4 · MOV · WebM — up to 120 s</p>
+        </div>
+        <div data-sf-upload-note role="status" style="margin-top:14px">
+          <div class="sf-note"><span>ℹ️</span><span><b>Demo mode.</b> No backend is connected on
+            this static page, so dropping a file runs a clearly-labeled <b>simulation</b> of the
+            real state machine — nothing is uploaded. Connect your SceneForge API below to build
+            real scenes from here.</span></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="sf-btn" type="button" data-sf-fail-demo>Show an honest failure</button>
+        </div>
+        <details style="margin-top:16px">
+          <summary class="sf-dim" style="cursor:pointer">Connect your API (optional)</summary>
+          <form data-sf-config-form style="display:grid;gap:10px;margin-top:12px">
+            <input name="apiBase" placeholder="https://api.yourdomain.tld" aria-label="API base URL"
+                   style="padding:12px 14px;border-radius:14px;border:1px solid var(--sf-border);background:rgba(0,0,0,.3);color:var(--sf-text-1);font:15px var(--sf-font)">
+            <input name="apiKey" placeholder="sk_… (stored only in this browser)" aria-label="API key"
+                   style="padding:12px 14px;border-radius:14px;border:1px solid var(--sf-border);background:rgba(0,0,0,.3);color:var(--sf-text-1);font:15px var(--sf-font)">
+            <button class="sf-btn" type="submit" style="justify-content:center">Save connection</button>
+            <p class="sf-faint">Keys stay in this browser's localStorage. Never paste a production
+              key into a page you don't control.</p>
+          </form>
+        </details>
+      </div>
+
+      <div class="sf-glass sf-window">
+        <h3>What happens next</h3>
+        <p class="sf-faint" style="margin-top:6px">The API's scene states, with the pipeline
+          stages inside <code>processing</code> shown for context — every state is reported,
+          including failure.</p>
+        <div class="sf-steps"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= embed ======================= -->
+  <section id="embed-section" class="sf-section" aria-label="Embed">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Embed</p>
+      <h2>One script. One tag.</h2>
+      <p class="sf-dim">The whole integration — a self-contained web component, no framework,
+        no COOP/COEP headers required of your page.</p>
+    </div>
+    <div class="sf-glass sf-window" style="margin-top:30px">
+      <pre class="sf-snippet" id="embed-code">&lt;script src="https://your-cdn/rf.js"&gt;&lt;/script&gt;
+&lt;rf-walkthrough
+    src="https://assets.example.com/scn_abc123/scene.ksplat"
+    poster="https://assets.example.com/scn_abc123/poster.png"
+    mode="walk"
+    height="480px"&gt;&lt;/rf-walkthrough&gt;</pre>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <button class="sf-btn" data-sf-copy="embed-code">Copy snippet</button>
+        <a class="sf-btn" href="../demo/">Raw embed demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= honest status ======================= -->
+  <section class="sf-section" aria-label="Project status">
+    <div class="sf-glass sf-window">
+      <p class="sf-eyebrow">Honest status</p>
+      <p class="sf-dim" style="margin-top:10px;max-width:78ch">Everything on this page runs today —
+        151 automated tests, a security red-team pass, and a real-browser E2E stand behind it. What
+        still needs physical hardware: the first GPU acceptance run (real capture end-to-end,
+        tape-measure accuracy check, lingbot confidence-floor tuning). Until then the sample scene
+        is synthetic and says so. Details: <code>QUALITY.md</code>.</p>
+    </div>
+  </section>
+
+  <footer class="sf-footer">
+    <p class="sf-faint">SceneForge · Apache-2.0 / MIT / BSD components only · geometry is never
+      invented — coverage and confidence are always reported.</p>
+    <nav aria-label="Footer">
+      <a href="./vision.html">Vision (VR) experience</a>
+      <a href="../demo/">Embed demo</a>
+      <a href="https://github.com/febufenn-cyber/3dlab">Source</a>
+    </nav>
+  </footer>
+</main>
+
+<script src="../dist/rf.js"></script>
+<script type="module" src="./assets/sf.js"></script>
+</body>
+</html>

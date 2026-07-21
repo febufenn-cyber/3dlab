@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SceneForge — embed demo</title>
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; max-width: 860px;
+         margin: 40px auto; padding: 0 16px; color: #222; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  .note { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>SceneForge embed demo</h1>
+<p class="note">This page is the minimal third-party embed. The full product UI lives at
+  <a href="../app/">the SceneForge app</a> (2D) and
+  <a href="../app/vision.html">SceneForge Vision</a> (spatial/XR).</p>
+<p>This is the whole integration — one script, one tag:</p>
+<pre>&lt;script src="../dist/rf.js"&gt;&lt;/script&gt;
+&lt;rf-walkthrough
+    src="./sample/scene.ksplat"
+    poster="./sample/poster.png"
+    mode="walk"
+    camera-position="0.7,0.6,1.5"
+    look-at="2.5,1.8,1.0"
+    height="480px"&gt;&lt;/rf-walkthrough&gt;</pre>
+
+<script src="../dist/rf.js"></script>
+<rf-walkthrough
+    src="./sample/scene.ksplat"
+    poster="./sample/poster.png"
+    mode="walk"
+    camera-position="0.7,0.6,1.5"
+    look-at="2.5,1.8,1.0"
+    height="480px"></rf-walkthrough>
+
+<p class="note">
+  The bundled sample is a <strong>procedurally generated synthetic room</strong>
+  (<code>viewer/tools/make-sample-scene.py</code>) — not a real capture, and
+  labeled as such on the poster too: SceneForge never passes generated content
+  off as a reconstruction. A real captured scene lands here after the first GPU
+  run (see <code>QUALITY.md</code>); the output of
+  <code>rf-scene build video.mp4 -o out/</code> drops into
+  <code>viewer/demo/sample/</code> as-is. Serve this folder over HTTP
+  (<code>python -m http.server</code> from <code>viewer/</code>).
+</p>
+</body>
+</html>

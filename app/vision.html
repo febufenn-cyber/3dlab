@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SceneForge Vision — spatial walkthroughs</title>
+<meta name="description" content="The spatial SceneForge experience: eye-and-pinch-first layout with immersive WebXR walkthroughs on supported headsets. Same scenes, same palette — deeper presence.">
+<meta name="theme-color" content="#05060a">
+<meta property="og:title" content="SceneForge Vision — spatial walkthroughs">
+<meta property="og:description" content="The spatial cut of SceneForge: immersive WebXR walkthroughs on supported headsets, honest capability detection everywhere else.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://febufenn-cyber.github.io/3dlab/app/vision.html">
+<meta property="og:image" content="https://febufenn-cyber.github.io/3dlab/demo/sample/poster.png">
+<link rel="stylesheet" href="./assets/sf.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235e5ce6'/%3E%3Crect x='7' y='7' width='18' height='18' rx='5' fill='none' stroke='white' stroke-opacity='.9' stroke-width='2.4'/%3E%3C/svg%3E">
+</head>
+<body class="sf-vision">
+<div class="sf-env" aria-hidden="true"></div>
+
+<main class="sf-shell" id="top">
+
+  <!-- ======================= hero ======================= -->
+  <header class="sf-hero sf-depth" data-depth="6">
+    <p class="sf-eyebrow">SceneForge · Vision</p>
+    <h1 class="sf-display">Your rooms,<br>at room scale.</h1>
+    <p class="sf-lede">The spatial cut of SceneForge: the same scenes, the same design language,
+      tuned for eyes and hands. On a WebXR headset the walkthrough leaves the window and becomes
+      the room around you. On a flat screen this page still works — it simply keeps the
+      walkthrough in its glass window.</p>
+    <div class="sf-hero-cta">
+      <a class="sf-btn sf-btn--primary" href="#scene">Open the scene</a>
+      <a class="sf-btn" href="#immersive">Immersive features</a>
+    </div>
+    <div class="sf-hero-meta" data-sf-xr-status aria-label="Device XR capabilities">
+      <!-- honest capability chips injected here: never claims support it can't detect -->
+    </div>
+  </header>
+
+  <!-- ======================= scene ======================= -->
+  <section id="scene" aria-label="Live sample scene">
+    <!-- No parallax on the stage: an inline transform from the pointer handler
+         would override the hover lift (inline style beats the class rule). -->
+    <div class="sf-stage sf-glass sf-window sf-hoverable">
+      <rf-walkthrough
+          src="../demo/sample/scene.ksplat"
+          poster="../demo/sample/poster.png"
+          mode="walk"
+          xr="vr"
+          camera-position="0.7,0.6,1.5"
+          look-at="2.5,1.8,1.0"
+          height="min(64vh, 600px)"></rf-walkthrough>
+      <div class="sf-stage-bar">
+        <span class="sf-chip" role="status" data-sf-viewer-status><span class="dot"></span>Look at the poster and pinch — or tap — to load</span>
+        <span class="hint">On XR-capable browsers, an <b>Enter VR</b> control appears inside the
+          stage once you start the scene</span>
+      </div>
+    </div>
+
+    <div class="sf-section" style="margin-top:26px">
+      <div class="sf-glass sf-window" data-sf-tabs>
+        <div class="sf-tabs" role="tablist" aria-label="Scene outputs">
+          <button class="sf-tab" role="tab" id="tab-walk" aria-controls="panel-walk" aria-selected="true">About this scene</button>
+          <button class="sf-tab" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">Floor plan</button>
+          <button class="sf-tab" role="tab" id="tab-insights" aria-controls="panel-insights" aria-selected="false" tabindex="-1">Insights</button>
+        </div>
+        <div class="sf-tabpanel" id="panel-walk" role="tabpanel" aria-labelledby="tab-walk">
+          <p class="sf-dim" style="max-width:70ch">This is the bundled <b>synthetic sample</b> — a
+            procedurally generated 4×3&nbsp;m room, labeled as such on its poster. The floor plan
+            is drawn by the pipeline's own SVG renderer; the insights come from a ground-truth
+            semantic document written from the generator's constants (the format a real
+            extraction produces — not itself an extraction). The first genuine capture replaces
+            all of it after the first GPU acceptance run (<code>QUALITY.md</code>).</p>
+        </div>
+        <div class="sf-tabpanel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+          <div class="sf-plan">
+            <img src="../demo/sample/floorplan.svg" alt="Auto-generated floor plan of the sample room: a 4 by 3 meter rectangle with one door and a table" loading="lazy">
+          </div>
+          <p class="sf-faint" style="margin-top:12px">Drawn by the pipeline's own
+            <code>render_floorplan_svg</code>. Dimensions carry a stated tolerance — estimates,
+            never survey-grade.</p>
+        </div>
+        <div class="sf-tabpanel" id="panel-insights" role="tabpanel" aria-labelledby="tab-insights" hidden>
+          <div data-sf-insights></div>
+          <p class="sf-faint" style="margin-top:14px">From <code>semantic.json</code> — frozen
+            schema&nbsp;1.0.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= immersive (XR-native features) ======================= -->
+  <section id="immersive" class="sf-section" aria-label="Immersive features">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Spatial-native</p>
+      <h2>What only a headset unlocks.</h2>
+      <p class="sf-dim">These features are native to XR devices and appear only in this Vision
+        experience. Capability chips above report what <i>your</i> current device actually
+        supports — nothing here pretends.</p>
+    </div>
+    <div class="sf-grid sf-grid--3">
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">🥽</div>
+        <h3>Immersive walkthrough</h3>
+        <p>One pinch on <b>Enter VR</b> and the splat surrounds you at true scale — the same
+          <code>.ksplat</code> the flat viewer streams, rendered stereo by WebXR. Works today on
+          WebXR browsers (e.g. Quest); on Safari for visionOS it lights up wherever immersive
+          WebXR sessions are enabled.</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">📏</div>
+        <h3>True-scale judgment</h3>
+        <p>Because scenes carry metric scale (with a stated tolerance), room-scale viewing means
+          "will the sofa fit" is answered by walking to where it would stand — not by squinting
+          at numbers.</p>
+      </div>
+      <div class="sf-card sf-glass sf-hoverable">
+        <div class="icon" aria-hidden="true">👁️</div>
+        <h3>Eye &amp; hand first</h3>
+        <p>This layout follows spatial conventions: a bottom ornament instead of a top bar,
+          52&nbsp;px-minimum targets on every control, and hover states that glow instead of
+          repainting — friendly to eye-tracking input.</p>
+      </div>
+    </div>
+    <div class="sf-note" style="margin-top:18px"><span>ℹ️</span>
+      <span><b>Honesty note:</b> passthrough-AR placement and hand-tracked measuring are on the
+      roadmap, not shipped. The immersive VR walkthrough above is the part that works today —
+      via the viewer's <code>xr="vr"</code> attribute — and only on devices whose chips read
+      "available."</span></div>
+  </section>
+
+  <!-- ======================= how (condensed) ======================= -->
+  <section id="how" class="sf-section" aria-label="How it works">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Pipeline</p>
+      <h2>Built for seconds of geometry.</h2>
+      <p class="sf-dim">Feed-forward lingbot-map (Apache-2.0) is designed to recover poses in one
+        pass rather than COLMAP's minutes — measured timings land with the first GPU acceptance
+        run. gsplat MCMC trains a compact splat under a hard size budget; open-vocabulary
+        detection labels rooms and objects; a confidence gate keeps every failure honest. Full
+        detail in the <a href="./index.html#how" style="color:var(--sf-cyan)">2D experience</a>.</p>
+    </div>
+  </section>
+
+  <!-- ======================= create ======================= -->
+  <section id="create" class="sf-section" aria-label="Create a scene">
+    <div class="sf-section-head">
+      <p class="sf-eyebrow">Create</p>
+      <h2>Capture flat. Relive spatial.</h2>
+      <p class="sf-dim">Film with the phone you have — 60–120&nbsp;s, slow steady pans. The scene
+        you get back plays everywhere, and becomes immersive here.</p>
+    </div>
+    <div class="sf-grid sf-grid--2" data-sf-upload>
+      <div class="sf-glass sf-window">
+        <div class="sf-drop" role="button" tabindex="0"
+             aria-label="Drop your video here, or press Enter to choose a file">
+          <input type="file" accept="video/mp4,video/quicktime,video/webm">
+          <p style="font-size:34px" aria-hidden="true">⬆️</p>
+          <p style="margin-top:6px;font:600 17px/1.3 var(--sf-font)">Drop your video here</p>
+          <p class="sf-faint" style="margin-top:8px">MP4 · MOV · WebM — up to 120 s</p>
+        </div>
+        <div data-sf-upload-note role="status" style="margin-top:14px">
+          <div class="sf-note"><span>ℹ️</span><span><b>Demo mode.</b> No backend is connected on
+            this static page — dropping a file runs a clearly-labeled <b>simulation</b> of the real
+            state machine. Connect an API in the <a href="./index.html#create"
+            style="color:var(--sf-cyan)">2D experience</a> to build real scenes.</span></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="sf-btn" type="button" data-sf-fail-demo>Show an honest failure</button>
+        </div>
+      </div>
+      <div class="sf-glass sf-window">
+        <h3>What happens next</h3>
+        <p class="sf-faint" style="margin-top:6px">The API's scene states, with the pipeline
+          stages inside <code>processing</code> shown for context — every state is reported,
+          including failure.</p>
+        <div class="sf-steps"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="sf-footer">
+    <p class="sf-faint">SceneForge Vision · same palette, same honesty — spatial presentation.
+      Geometry is never invented; coverage and confidence are always reported.</p>
+    <nav aria-label="Footer">
+      <a href="./index.html">2D experience</a>
+      <a href="../demo/">Embed demo</a>
+      <a href="https://github.com/febufenn-cyber/3dlab">Source</a>
+    </nav>
+  </footer>
+</main>
+
+<!-- Vision navigation: floating bottom ornament (visionOS convention) -->
+<nav class="sf-ornament sf-glass" aria-label="Primary">
+  <a class="sf-brand" href="#top"><span class="mark" aria-hidden="true"></span>Vision</a>
+  <a class="sf-nav-link" href="#scene">Scene</a>
+  <a class="sf-nav-link" href="#immersive">Immersive</a>
+  <a class="sf-nav-link" href="#create">Create</a>
+  <a class="sf-nav-link" href="./index.html" title="Flat layout for phones and desktops">2D&nbsp;↗</a>
+</nav>
+
+<script src="../dist/rf.js"></script>
+<script type="module" src="./assets/sf.js"></script>
+<script type="module">
+  // Gentle pointer parallax on [data-depth] layers — spatial depth cue on flat
+  // screens, skipped entirely for reduced-motion users and touch-only devices.
+  const fine = matchMedia('(pointer: fine)').matches;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (fine && !still) {
+    const layers = [...document.querySelectorAll('.sf-depth')];
+    let raf = 0;
+    addEventListener('pointermove', (e) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const dx = (e.clientX / innerWidth - 0.5), dy = (e.clientY / innerHeight - 0.5);
+        layers.forEach((l) => {
+          const d = Number(l.dataset.depth || 4);
+          l.style.transform = `translate3d(${(-dx * d).toFixed(1)}px, ${(-dy * d).toFixed(1)}px, 0)`;
+        });
+      });
+    }, { passive: true });
+  }
+</script>
+</body>
+</html>
