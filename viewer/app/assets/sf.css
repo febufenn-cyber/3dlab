@@ -1,0 +1,438 @@
+/* SceneForge app — "Vision glass" design system.
+ *
+ * One design language, two experiences:
+ *   index.html   — flat/2D devices (top nav, pointer-first)
+ *   vision.html  — spatial/XR devices (bottom ornament, eye+pinch-first,
+ *                  immersive WebXR features live only here)
+ * Both share every token below — same palette, same glass, same type —
+ * so the brand reads identically on a phone and in a headset.
+ *
+ * The material system follows visionOS conventions: translucent "glass"
+ * panels over a dark environment, specular top edge, vibrancy text tiers,
+ * continuous-feel large radii, and hover states that glow rather than
+ * repaint (eye-tracking friendly). All values are plain CSS — no framework.
+ */
+
+/* ---------- tokens ---------- */
+:root {
+  /* environment (deep, not pure black — glass needs something to refract) */
+  --sf-space-0: #05060a;
+  --sf-space-1: #0b0d14;
+  --sf-space-2: #14161f;
+
+  /* ambient accents (Apple system dark palette: indigo / cyan, warm sparingly) */
+  --sf-indigo: #5e5ce6;
+  --sf-cyan: #64d2ff;
+  --sf-warm: #ff9f0a;
+  --sf-red: #ff453a;
+  --sf-green: #30d158;
+
+  /* glass material */
+  --sf-glass: rgba(255, 255, 255, 0.07);
+  --sf-glass-strong: rgba(255, 255, 255, 0.11);
+  --sf-glass-press: rgba(255, 255, 255, 0.16);
+  --sf-border: rgba(255, 255, 255, 0.14);
+  --sf-border-hi: rgba(255, 255, 255, 0.30);
+  /* visionOS glass filter: saturate(1.5) + blur + brightness(0.85) — the
+     luminance clamp is what separates real visionOS glass from generic
+     glassmorphism (Apple HIG / WWDC material references). */
+  --sf-backdrop: saturate(1.5) blur(42px) brightness(0.85);
+  --sf-backdrop-ctl: saturate(1.5) blur(24px) brightness(0.85);
+
+  /* vibrancy text tiers — tier 3 sits at 0.62, the floor that keeps normal-size
+     text ≥ WCAG AA 4.5:1 over the lightest realistic backdrop (hovered glass on
+     the indigo env glow computes ≈5.3:1; 0.40 measured 3.3–3.8:1 and failed). */
+  --sf-text-1: rgba(255, 255, 255, 0.96);
+  --sf-text-2: rgba(255, 255, 255, 0.66);
+  --sf-text-3: rgba(255, 255, 255, 0.62);
+
+  /* shape — visionOS-style continuous large radii */
+  --sf-r-window: 28px;
+  --sf-r-card: 20px;
+  --sf-r-ctl: 14px;
+  --sf-r-pill: 999px;
+
+  /* motion */
+  --sf-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --sf-t-fast: 160ms;
+  --sf-t-med: 280ms;
+
+  /* type */
+  --sf-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+             Inter, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --sf-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---------- base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--sf-font);
+  font-weight: 500;               /* visionOS body sits at Medium, not Regular */
+  color: var(--sf-text-1);
+  background: var(--sf-space-0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+::selection { background: rgba(94, 92, 230, 0.45); }
+
+/* the "room" the glass floats in: layered ambient glows, fixed so panels
+   appear to move over a lit environment */
+.sf-env {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(52rem 36rem at 12% -8%, rgba(94, 92, 230, 0.20), transparent 62%),
+    radial-gradient(46rem 32rem at 96% 12%, rgba(100, 210, 255, 0.12), transparent 60%),
+    radial-gradient(60rem 42rem at 50% 118%, rgba(94, 92, 230, 0.10), transparent 65%),
+    linear-gradient(180deg, var(--sf-space-1), var(--sf-space-0) 55%);
+}
+.sf-env::after { /* fine grain so gradients don't band */
+  content: ""; position: absolute; inset: 0; opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .02 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.sf-shell { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+section { scroll-margin-top: 96px; }
+
+/* ---------- type scale ---------- */
+h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.022em; }
+.sf-display {
+  font-size: clamp(42px, 7vw, 74px); line-height: 1.04; font-weight: 700;
+  background: linear-gradient(135deg, #fff 30%, rgba(190, 205, 255, 0.85) 70%, rgba(150, 214, 255, 0.8));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+h2 { font-size: clamp(26px, 4vw, 38px); line-height: 1.12; }
+h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; line-height: 1.6; }
+.sf-lede { font-size: clamp(16px, 2vw, 19px); color: var(--sf-text-2); max-width: 56ch; }
+.sf-dim { color: var(--sf-text-2); }
+.sf-faint { color: var(--sf-text-3); }
+.sf-eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--sf-text-3);
+}
+code, .sf-code { font-family: var(--sf-mono); font-size: 0.92em; }
+
+/* ---------- glass materials ---------- */
+.sf-glass {
+  background: var(--sf-glass);
+  -webkit-backdrop-filter: var(--sf-backdrop);
+  backdrop-filter: var(--sf-backdrop);
+  border: 1px solid var(--sf-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.20),   /* specular top edge */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+}
+/* honest fallback when backdrop-filter is unavailable */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  .sf-glass { background: rgba(18, 20, 31, 0.94); }
+}
+.sf-window { border-radius: var(--sf-r-window); padding: clamp(20px, 3.4vw, 36px); }
+.sf-card { border-radius: var(--sf-r-card); padding: 22px; }
+
+/* eye-friendly hover: glow + lift, never a colour repaint */
+.sf-hoverable { transition: transform var(--sf-t-med) var(--sf-ease),
+                            border-color var(--sf-t-med) var(--sf-ease),
+                            background var(--sf-t-med) var(--sf-ease),
+                            box-shadow var(--sf-t-med) var(--sf-ease); }
+.sf-hoverable:hover {
+  transform: translateY(-2px);
+  border-color: var(--sf-border-hi);
+  background: var(--sf-glass-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 30px 70px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(120, 160, 255, 0.08),
+    0 0 44px rgba(94, 92, 230, 0.18);
+}
+
+/* ---------- controls ---------- */
+.sf-pill, .sf-btn {
+  font: 600 15px/1 var(--sf-font); letter-spacing: -0.01em;
+  color: var(--sf-text-1); cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: var(--sf-r-pill); border: 1px solid var(--sf-border);
+  background: var(--sf-glass);
+  -webkit-backdrop-filter: var(--sf-backdrop-ctl);
+  backdrop-filter: var(--sf-backdrop-ctl);
+  padding: 13px 22px; min-height: 44px;           /* comfortable eye/touch target */
+  transition: transform var(--sf-t-fast) var(--sf-ease),
+              background var(--sf-t-fast) var(--sf-ease),
+              border-color var(--sf-t-fast) var(--sf-ease),
+              box-shadow var(--sf-t-fast) var(--sf-ease);
+}
+.sf-pill:hover, .sf-btn:hover {
+  background: var(--sf-glass-strong); border-color: var(--sf-border-hi);
+  box-shadow: 0 0 0 1px rgba(140, 170, 255, 0.10), 0 0 34px rgba(94, 92, 230, 0.22);
+}
+.sf-pill:active, .sf-btn:active { transform: scale(0.985); background: var(--sf-glass-press); }
+.sf-btn--primary {
+  background: linear-gradient(135deg, rgba(94, 92, 230, 0.85), rgba(78, 128, 238, 0.85));
+  border-color: rgba(150, 160, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 12px 34px rgba(94, 92, 230, 0.35);
+}
+.sf-btn--primary:hover {
+  background: linear-gradient(135deg, rgba(104, 102, 240, 0.95), rgba(88, 138, 248, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 16px 44px rgba(94, 92, 230, 0.5);
+}
+.sf-btn[disabled] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+/* Outline only — never reshape the control (pills stay pills when focused). */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid rgba(100, 210, 255, 0.85); outline-offset: 3px;
+}
+
+/* Visually hidden, still announced — for status text and step states. */
+.sf-vh {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+.sf-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: 500 13px/1 var(--sf-font); color: var(--sf-text-2);
+  border: 1px solid var(--sf-border); border-radius: var(--sf-r-pill);
+  padding: 7px 13px; background: rgba(255, 255, 255, 0.04);
+}
+.sf-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sf-text-3); }
+.sf-chip--ok .dot { background: var(--sf-green); box-shadow: 0 0 10px rgba(48, 209, 88, 0.7); }
+.sf-chip--warn .dot { background: var(--sf-warm); box-shadow: 0 0 10px rgba(255, 159, 10, 0.7); }
+.sf-chip--err .dot { background: var(--sf-red); box-shadow: 0 0 10px rgba(255, 69, 58, 0.7); }
+.sf-chip--info .dot { background: var(--sf-cyan); box-shadow: 0 0 10px rgba(100, 210, 255, 0.7); }
+
+.sf-kbd {
+  font: 500 12px/1 var(--sf-mono); color: var(--sf-text-2);
+  border: 1px solid var(--sf-border); border-bottom-width: 2px;
+  border-radius: 7px; padding: 4px 7px; background: rgba(255, 255, 255, 0.05);
+}
+
+/* ---------- navigation ---------- */
+/* 2D: classic glass top bar */
+.sf-topnav {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 40; display: flex; align-items: center; gap: 4px;
+  border-radius: var(--sf-r-pill); padding: 6px;
+  max-width: min(96vw, 880px);
+  overflow-x: auto; scrollbar-width: none;   /* narrow screens: swipe the pill */
+  -webkit-overflow-scrolling: touch;
+}
+.sf-topnav::-webkit-scrollbar { display: none; }
+/* Vision: floating bottom ornament (visionOS convention) */
+.sf-ornament {
+  position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  z-index: 40; display: flex; align-items: center; gap: 4px;
+  border-radius: var(--sf-r-pill); padding: 8px;
+  max-width: 96vw;
+  overflow-x: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sf-ornament::-webkit-scrollbar { display: none; }
+.sf-nav-link {
+  font: 600 14px/1 var(--sf-font); color: var(--sf-text-2); text-decoration: none;
+  padding: 10px 16px; border-radius: var(--sf-r-pill); border: 1px solid transparent;
+  transition: color var(--sf-t-fast) var(--sf-ease), background var(--sf-t-fast) var(--sf-ease);
+  white-space: nowrap;
+}
+.sf-nav-link:hover { color: var(--sf-text-1); background: rgba(255, 255, 255, 0.08); }
+.sf-nav-link[aria-current="true"] {
+  color: var(--sf-text-1); background: rgba(255, 255, 255, 0.12);
+  border-color: var(--sf-border);
+}
+.sf-brand {
+  display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px 8px 10px;
+  font: 700 15px/1 var(--sf-font); color: var(--sf-text-1); text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.sf-brand .mark {
+  width: 22px; height: 22px; border-radius: 7px;
+  background: conic-gradient(from 210deg, var(--sf-indigo), var(--sf-cyan), var(--sf-indigo));
+  box-shadow: 0 0 18px rgba(94, 92, 230, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ---------- hero ---------- */
+.sf-hero { padding: clamp(120px, 18vh, 180px) 0 40px; text-align: center; }
+.sf-hero .sf-lede { margin: 22px auto 0; }
+.sf-hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+.sf-hero-meta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+
+/* ---------- stage (viewer window) ---------- */
+.sf-stage { margin: 46px auto 0; padding: clamp(10px, 1.6vw, 16px); }
+.sf-stage rf-walkthrough {
+  /* Concentric with the window: inner radius = outer radius − actual padding. */
+  border-radius: calc(var(--sf-r-window) - clamp(10px, 1.6vw, 16px));
+  overflow: hidden; display: block;
+}
+/* The centerpiece control gets the design system, not browser-default chrome. */
+rf-walkthrough::part(play) {
+  font: 600 15px/1 var(--sf-font); color: var(--sf-text-1);
+  background: rgba(10, 12, 18, 0.55); border: 1px solid var(--sf-border-hi);
+  border-radius: var(--sf-r-pill); padding: 14px 26px; min-height: 48px;
+  -webkit-backdrop-filter: var(--sf-backdrop-ctl); backdrop-filter: var(--sf-backdrop-ctl);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 30px rgba(0, 0, 0, 0.45);
+  cursor: pointer; transition: background var(--sf-t-fast) var(--sf-ease);
+}
+rf-walkthrough::part(play):hover {
+  background: rgba(94, 92, 230, 0.5);
+}
+.sf-stage-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; padding: 12px 8px 4px;
+}
+.sf-stage-bar .hint { font-size: 13px; color: var(--sf-text-3); }
+
+/* ---------- grids ---------- */
+.sf-grid { display: grid; gap: 16px; margin-top: 34px; }
+/* min() keeps tracks from forcing horizontal overflow below the min width
+   (a 320 px viewport has ~288 px of content — 310 px tracks clipped it). */
+.sf-grid--3 { grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); }
+.sf-grid--2 { grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr)); }
+.sf-card .icon {
+  width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center;
+  font-size: 19px; margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(94, 92, 230, 0.35), rgba(100, 210, 255, 0.18));
+  border: 1px solid rgba(140, 170, 255, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.sf-card h3 { margin-bottom: 8px; }
+.sf-card p { font-size: 14.5px; color: var(--sf-text-2); }
+
+/* ---------- tabs (scene panel) ---------- */
+.sf-tabs { display: flex; gap: 4px; padding: 5px; border-radius: var(--sf-r-pill);
+           background: rgba(0, 0, 0, 0.25); border: 1px solid var(--sf-border);
+           width: max-content; max-width: 100%; overflow-x: auto; }
+.sf-tab {
+  font: 600 14px/1 var(--sf-font); color: var(--sf-text-2);
+  border: 0; background: transparent; cursor: pointer;
+  padding: 10px 18px; border-radius: var(--sf-r-pill); white-space: nowrap;
+  transition: background var(--sf-t-fast) var(--sf-ease), color var(--sf-t-fast) var(--sf-ease);
+}
+.sf-tab:hover { color: var(--sf-text-1); background: rgba(255, 255, 255, 0.07); }
+.sf-tab[aria-selected="true"] {
+  color: var(--sf-text-1); background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.sf-tabpanel { margin-top: 16px; }
+.sf-tabpanel[hidden] { display: none; }
+
+/* floor plan renders on "paper" — plans read better light */
+.sf-plan {
+  background: #f4f2ec; border-radius: var(--sf-r-card); padding: 18px;
+  display: grid; place-items: center; min-height: 320px;
+}
+.sf-plan img { max-width: 100%; height: auto; }
+
+.sf-insights { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.sf-stat { border: 1px solid var(--sf-border); border-radius: var(--sf-r-card);
+           padding: 16px; background: rgba(255, 255, 255, 0.04); }
+.sf-stat .v { font: 700 24px/1.1 var(--sf-font); letter-spacing: -0.02em; }
+.sf-stat .k { font-size: 12.5px; color: var(--sf-text-3); margin-top: 6px; }
+
+pre.sf-snippet {
+  margin: 0; padding: 18px; border-radius: var(--sf-r-card);
+  background: rgba(0, 0, 0, 0.4); border: 1px solid var(--sf-border);
+  font: 13px/1.55 var(--sf-mono); color: var(--sf-text-2);
+  overflow-x: auto; white-space: pre;
+}
+
+/* ---------- create / upload flow ---------- */
+.sf-drop {
+  border: 1.5px dashed rgba(255, 255, 255, 0.22); border-radius: var(--sf-r-card);
+  padding: 34px 22px; text-align: center; cursor: pointer;
+  transition: border-color var(--sf-t-fast) var(--sf-ease), background var(--sf-t-fast) var(--sf-ease);
+}
+.sf-drop:hover, .sf-drop.drag { border-color: rgba(100, 210, 255, 0.6);
+                                background: rgba(100, 210, 255, 0.05); }
+.sf-drop input { display: none; }
+
+.sf-steps { display: grid; gap: 10px; margin-top: 18px; }
+.sf-step { display: flex; align-items: center; gap: 13px; padding: 13px 16px;
+           border: 1px solid var(--sf-border); border-radius: var(--sf-r-card);
+           background: rgba(255, 255, 255, 0.03);
+           transition: border-color var(--sf-t-med) var(--sf-ease), background var(--sf-t-med) var(--sf-ease); }
+.sf-step .ind { width: 26px; height: 26px; border-radius: 50%; flex: none;
+                display: grid; place-items: center; font: 700 12px/1 var(--sf-font);
+                border: 1.5px solid var(--sf-border); color: var(--sf-text-3); }
+.sf-step .lbl { font: 600 14.5px/1.3 var(--sf-font); }
+.sf-step .sub { font-size: 12.5px; color: var(--sf-text-3); margin-top: 2px; }
+.sf-step.active { border-color: rgba(100, 210, 255, 0.45); background: rgba(100, 210, 255, 0.06); }
+.sf-step.active .ind { border-color: var(--sf-cyan); color: var(--sf-cyan); }
+.sf-step.done .ind { border-color: var(--sf-green); background: rgba(48, 209, 88, 0.16);
+                     color: var(--sf-green); }
+.sf-step.failed { border-color: rgba(255, 69, 58, 0.5); background: rgba(255, 69, 58, 0.07); }
+.sf-step.failed .ind { border-color: var(--sf-red); color: var(--sf-red); }
+@keyframes sf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.sf-step.active .ind { animation: sf-pulse 1.6s var(--sf-ease) infinite; }
+
+.sf-note {
+  display: flex; gap: 11px; align-items: flex-start;
+  border: 1px solid rgba(255, 159, 10, 0.35); border-radius: var(--sf-r-card);
+  background: rgba(255, 159, 10, 0.07); padding: 14px 16px;
+  font-size: 13.5px; line-height: 1.5; color: var(--sf-text-2);
+}
+.sf-note.err { border-color: rgba(255, 69, 58, 0.4); background: rgba(255, 69, 58, 0.07); }
+.sf-note.ok { border-color: rgba(48, 209, 88, 0.35); background: rgba(48, 209, 88, 0.06); }
+
+/* ---------- XR feature panel (vision only) ---------- */
+.sf-xr-badge { display: inline-flex; gap: 8px; align-items: center; }
+
+/* ---------- footer ---------- */
+.sf-footer { margin: 90px 0 120px; text-align: center; }
+.sf-footer .sf-faint { font-size: 13px; }
+.sf-footer nav { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.sf-footer a { color: var(--sf-text-2); text-decoration: none; font-size: 14px; }
+.sf-footer a:hover { color: var(--sf-text-1); }
+
+/* ---------- section rhythm ---------- */
+.sf-section { margin-top: clamp(80px, 12vh, 130px); }
+.sf-section-head { max-width: 62ch; }
+.sf-section-head h2 { margin-top: 10px; }
+.sf-section-head p { margin-top: 14px; }
+
+/* ---------- vision (spatial) modifiers ---------- */
+/* Applied by vision.html only: eye+pinch-first sizing (bigger targets, more
+   generous glow), ornament clearance, and gentle pointer parallax. The
+   palette is identical to the 2D experience by construction — same tokens. */
+body.sf-vision { font-size: 17px; }
+body.sf-vision .sf-pill, body.sf-vision .sf-btn {
+  min-height: 52px; padding: 15px 26px; font-size: 16px;
+}
+/* Every interactive target in the spatial layout meets the 52 px floor the
+   page's copy promises — links and tabs included, not just buttons. */
+body.sf-vision .sf-nav-link,
+body.sf-vision .sf-tab {
+  padding: 13px 20px; font-size: 15px;
+  min-height: 52px; display: inline-flex; align-items: center;
+}
+body.sf-vision .sf-hoverable:hover { transform: translateY(-3px) scale(1.012); }
+body.sf-vision main { padding-bottom: 130px; }   /* keep clear of the ornament */
+.sf-depth { will-change: transform; transition: transform 120ms linear; }
+@media (prefers-reduced-motion: reduce) { .sf-depth { transition: none; } }
+
+/* ---------- reduced motion / contrast / small screens ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* Match or beat every hover-transform's specificity — incl. the vision
+     variant's scale, which a bare .sf-hoverable rule would lose to. */
+  .sf-hoverable:hover, body.sf-vision .sf-hoverable:hover { transform: none; }
+}
+@media (prefers-contrast: more) {
+  :root { --sf-border: rgba(255, 255, 255, 0.4); --sf-text-2: rgba(255, 255, 255, 0.85);
+          --sf-text-3: rgba(255, 255, 255, 0.7); }
+}
+/* Mirror the OS Reduced Transparency setting: solid panels, no filter. */
+@media (prefers-reduced-transparency: reduce) {
+  .sf-glass, .sf-pill, .sf-btn {
+    background: rgba(30, 30, 36, 0.94);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+@media (max-width: 640px) {
+  .sf-topnav { top: 10px; }
+  .sf-topnav .sf-nav-link:not(:first-child) { padding: 10px 11px; font-size: 13px; }
+  .sf-ornament { bottom: 10px; }
+  .sf-window { padding: 18px; }
+}

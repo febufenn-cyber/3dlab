@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **139 automated tests green** (78 pipeline + 58 API + 3 real-browser E2E), covering:
+- **151 automated tests green** (78 pipeline + 61 API + 12 real-browser E2E), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
@@ -43,6 +43,25 @@ Evidence for what works, and an honest ledger of what is not yet proven.
     `rf.js` + sample scene load end-to-end to a rendering WebGL canvas —
     element upgrade, poster gate, .ksplat parse, GaussianSplats3D boot, walk
     mode; component load stalls surface `rf-error` within a bounded timeout.
+  - **app UI E2E** (`viewer/app/`, both experiences): 2D page boots with zero
+    page errors and no `xr` attr; insight stats populate from the real
+    `semantic.json` incl. the synthetic-sample warning; the upload demo is
+    labeled SIMULATION; the honest-failure demo surfaces `capture_rule`;
+    the Vision page's XR capability chips refuse to claim support headless
+    Chromium doesn't have; `xr="vr"` never breaks flat loading, `rf-xr`
+    reports `supported: false` honestly, **flat-screen orbit controls still
+    exist when XR is unsupported** (regression for GS3D 0.4.7 dropping its
+    controls whenever `webXRMode` is set), and neither page overflows
+    horizontally at a 320 px viewport,
+  - **CORS opt-in** (`test_cors.py`): disabled by default (no headers),
+    explicit-origin preflight + echo for the browser dashboard flow, unknown
+    origins get no allowance — and never a wildcard.
+  - The app UI additionally survived a **51-agent adversarial review**
+    (6 lenses × refutation-verified): 36 confirmed findings fixed in place —
+    incl. WCAG AA contrast (tier-3 text 0.40→0.62), aria-live status/alert
+    announcements, XSS-escaping every API-derived interpolation, the
+    reload-crash + WebGL-context-leak lifecycle paths, capability-gated
+    `webXRMode`, and the Y-up re-basing that keeps VR scenes upright.
   - **security regressions** (P2 red-team, `SECURITY.md`): the unauth
     ~300 MB-POST OOM is 413'd reading zero body bytes (proven), per-key rate
     limit + outstanding-scene cap fire, reaper batches its queries and expires

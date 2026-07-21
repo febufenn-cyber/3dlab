@@ -1,0 +1,152 @@
+{
+  "scene_id": "scn_sample0synthetic",
+  "schema_version": "1.0",
+  "units": "meters",
+  "scale": {
+    "method": "user_dimension",
+    "confidence": 1.0,
+    "tolerance_pct": 0.0
+  },
+  "rooms": [
+    {
+      "id": "room_0",
+      "label": "room",
+      "polygon": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ],
+        [
+          4.0,
+          3.0
+        ],
+        [
+          0.0,
+          3.0
+        ]
+      ],
+      "area_m2": 12.0,
+      "ceiling_height_m": 2.6
+    }
+  ],
+  "walls": [
+    {
+      "id": "wall_0",
+      "start": [
+        0.0,
+        0.0
+      ],
+      "end": [
+        4.0,
+        0.0
+      ],
+      "height_m": 2.6
+    },
+    {
+      "id": "wall_1",
+      "start": [
+        4.0,
+        0.0
+      ],
+      "end": [
+        4.0,
+        3.0
+      ],
+      "height_m": 2.6
+    },
+    {
+      "id": "wall_2",
+      "start": [
+        4.0,
+        3.0
+      ],
+      "end": [
+        0.0,
+        3.0
+      ],
+      "height_m": 2.6
+    },
+    {
+      "id": "wall_3",
+      "start": [
+        0.0,
+        3.0
+      ],
+      "end": [
+        0.0,
+        0.0
+      ],
+      "height_m": 2.6
+    }
+  ],
+  "openings": [
+    {
+      "id": "door_0",
+      "type": "door",
+      "wall_id": "wall_1",
+      "center": [
+        4.0,
+        2.0,
+        1.0
+      ],
+      "width_m": 0.9,
+      "height_m": 2.0
+    }
+  ],
+  "objects": [
+    {
+      "id": "obj_0",
+      "label": "table",
+      "bbox": {
+        "center": [
+          2.5,
+          1.8,
+          0.36
+        ],
+        "size": [
+          1.2,
+          0.6,
+          0.72
+        ],
+        "rot_z": 0.0
+      },
+      "confidence": 1.0
+    },
+    {
+      "id": "obj_1",
+      "label": "rug",
+      "bbox": {
+        "center": [
+          2.5,
+          1.8,
+          0.006
+        ],
+        "size": [
+          2.0,
+          1.4,
+          0.012
+        ],
+        "rot_z": 0.0
+      },
+      "confidence": 1.0
+    }
+  ],
+  "assets": {
+    "splat_url": "./scene.ksplat",
+    "floorplan_svg_url": "./floorplan.svg",
+    "poster_url": "./poster.png"
+  },
+  "quality": {
+    "coverage_pct": 100.0,
+    "registered_frames": 0,
+    "blur_rejected_pct": 0.0,
+    "reconstruction_confidence": 1.0,
+    "warnings": [
+      "synthetic sample: procedurally generated, not a real capture"
+    ]
+  }
+}

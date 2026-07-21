@@ -28,7 +28,7 @@ Estimates are never survey-grade and say so.
 | --- | --- | --- |
 | `pipeline/` | the engine: `rf-scene build video.mp4 -o out/` (GPU worker) | [LLD](docs/LLD.md) |
 | `api/` | FastAPI + queue + storage + GPU adapters + Docker | [RUNBOOK](docs/RUNBOOK.md) |
-| `viewer/` | `<rf-walkthrough>` web component (`dist/rf.js`) | [viewer/README](viewer/README.md) |
+| `viewer/` | `<rf-walkthrough>` web component (`dist/rf.js`) + the app UI (`app/`: 2D + Vision/XR experiences) | [viewer/README](viewer/README.md) |
 | `docs/` | LLD, quickstart, capture contract, runbook | [QUICKSTART](docs/QUICKSTART.md) · [CAPTURE_GUIDE](docs/CAPTURE_GUIDE.md) |
 | meta | [DECISIONS.md](DECISIONS.md) · [LICENSES.md](LICENSES.md) (all verified) · [QUALITY.md](QUALITY.md) | |
 
@@ -36,7 +36,7 @@ Estimates are never survey-grade and say so.
 
 ```bash
 pip install -e pipeline[dev] -e api[dev]
-python -m pytest pipeline/tests api/tests          # 136 tests + browser E2E
+python -m pytest pipeline/tests api/tests viewer/tests   # 151 tests incl. browser E2E
 rf-scene schema                                     # frozen contract v1.0
 uvicorn sceneforge_api.main:app                     # dev API (SQLite + local storage)
 cd viewer && npm install && npm run build           # dist/rf.js

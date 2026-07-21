@@ -44,6 +44,8 @@ jobs:
           playwright install chromium --with-deps
       - name: Real-browser viewer E2E (rf.js + sample scene in headless Chromium)
         run: python -m pytest viewer/tests/test_viewer_e2e.py -q
+      - name: App UI E2E (2D + Vision experiences, honesty assertions)
+        run: python -m pytest viewer/tests/test_app_e2e.py -q
 
   viewer-build:
     runs-on: ubuntu-latest
