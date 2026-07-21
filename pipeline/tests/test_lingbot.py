@@ -138,10 +138,48 @@ def test_no_confident_points_raises():
         )
 
 
-def test_backend_registered_and_commercial_selectable():
-    # lingbot is selectable on the default (non-research) path…
+def test_lingbot_is_default_and_colmap_still_selectable():
+    # lingbot is now the default backend (D34)…
+    assert GeometryConfig().backend == "lingbot"
     backend = get_backend("lingbot", research=False)
     assert isinstance(backend, LingbotMapBackend)
     assert backend.commercial_safe is True
-    # …but COLMAP remains the config default.
-    assert GeometryConfig().backend == "colmap_glomap"
+    # …and COLMAP remains the selectable classical fallback.
+    from sceneforge_pipeline.stages.geometry import ColmapGlomapBackend
+
+    assert isinstance(get_backend("colmap_glomap", research=False), ColmapGlomapBackend)
+
+
+def test_confidence_stats():
+    from sceneforge_pipeline.stages.lingbot import lingbot_confidence_stats
+
+    conf = np.array([0.9, 0.8, 0.1, 0.2, 0.95])
+    s = lingbot_confidence_stats({"world_points_conf": conf}, conf_threshold=0.5)
+    assert s["has_confidence"] and s["n_total"] == 5 and s["n_confident"] == 3
+    assert s["confident_ratio"] == 0.6
+    # No confidence channel → gate is skipped, not failed.
+    assert lingbot_confidence_stats({}, 0.5)["has_confidence"] is False
+
+
+def test_confidence_gate_fails_low_confidence():
+    from sceneforge_pipeline.errors import QualityGateError
+    from sceneforge_pipeline.stages.geometry import _apply_confidence_gate
+
+    cfg = GeometryConfig()  # floors: 2000 points, 10%
+    # High point count but low confident-ratio → fail loud (honest failure).
+    stats = {"has_confidence": True, "n_total": 100000, "n_confident": 3000,
+             "confident_ratio": 0.03}
+    with pytest.raises(QualityGateError) as exc:
+        _apply_confidence_gate(stats, cfg)
+    assert exc.value.reason_code == "insufficient_reconstruction_confidence"
+
+
+def test_confidence_gate_passes_healthy():
+    from sceneforge_pipeline.stages.geometry import _apply_confidence_gate
+
+    cfg = GeometryConfig()
+    good = {"has_confidence": True, "n_total": 100000, "n_confident": 60000,
+            "confident_ratio": 0.6}
+    _apply_confidence_gate(good, cfg)  # must not raise
+    # No confidence channel → skipped, never raises.
+    _apply_confidence_gate({"has_confidence": False}, cfg)

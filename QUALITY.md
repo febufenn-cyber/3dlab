@@ -5,7 +5,7 @@ Evidence for what works, and an honest ledger of what is not yet proven.
 
 ## Verified now (this environment, CPU, 2026-07-17)
 
-- **136 automated tests green** (75 pipeline + 58 API + 3 real-browser E2E), covering:
+- **139 automated tests green** (78 pipeline + 58 API + 3 real-browser E2E), covering:
   - frozen schema v1.0 (brief's example document validates; extra fields,
     bad ids, wrong units all rejected),
   - COLMAP binary model I/O round-trip (incl. rotation↔quaternion round-trip),
@@ -78,3 +78,13 @@ GPU. This repo intentionally ships the protocol instead of fabricated numbers:
 Known-risk items to watch on first hardware run (flagged in code comments):
 gsplat MCMC hyperparameters on sparse indoor clouds, OWLv2 door recall at
 score ≥ 0.30 on Indian interior stock, ksplat SH quantization at level 2.
+
+**lingbot-map is now the default backend (D34) but has never run end-to-end
+here** (no GPU). The acceptance run must additionally: (a) confirm lingbot
+produces poses/points that flow through undistort-skip → gsplat cleanly;
+(b) tune the confidence-gate floors (`lingbot_min_confident_points` 2000 /
+`lingbot_min_confident_ratio` 10 %) against real captures so honest failures
+fire without false rejects; and ideally (c) run COLMAP vs lingbot on the same
+video to quantify the pose-accuracy / splat-quality trade before relying on the
+faster default in production. Until then, `--backend colmap_glomap` is the
+verified-working classical path.

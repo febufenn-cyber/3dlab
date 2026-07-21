@@ -50,6 +50,29 @@ def _as_array(d, *names):
     return None
 
 
+def lingbot_confidence_stats(output: dict, conf_threshold: float = 0.5) -> dict:
+    """Confidence summary for the honest-failure gate.
+
+    A feed-forward model always emits poses, so we judge reconstruction health
+    by how many world points clear ``conf_threshold``. Returns counts + ratio;
+    when no confidence channel is present, reports ``has_confidence=False`` and
+    the gate is skipped (we can't judge, so we don't reject).
+    """
+    conf = _as_array(output, "world_points_conf", "world_points_confidence", "conf")
+    if conf is None or conf.size == 0:
+        return {"has_confidence": False, "n_total": 0, "n_confident": 0, "confident_ratio": 0.0}
+    conf = conf.reshape(-1)
+    n_total = int(conf.size)
+    n_conf = int((conf >= conf_threshold).sum())
+    return {
+        "has_confidence": True,
+        "n_total": n_total,
+        "n_confident": n_conf,
+        "confident_ratio": round(n_conf / n_total, 4) if n_total else 0.0,
+        "mean_confidence": round(float(conf.mean()), 4),
+    }
+
+
 def lingbot_to_colmap_model(
     output: dict,
     conf_threshold: float = 0.5,

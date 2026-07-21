@@ -28,15 +28,18 @@ class IngestConfig:
 
 @dataclass(frozen=True)
 class GeometryConfig:
-    backend: str = "colmap_glomap"      # default commercial-safe path (brief §4.2)
-    matcher: str = "sequential"         # video ⇒ sequential matching with loop detection
+    # Default: lingbot-map — feed-forward, seconds not minutes, best fit for the
+    # GPU budget (product decision 2026-07-20, D34). Apache-2.0, verified via the
+    # GitHub license API + owner confirmation (LICENSES.md). COLMAP stays the
+    # fully-classical fallback: `--backend colmap_glomap`.
+    backend: str = "lingbot"
+    matcher: str = "sequential"         # COLMAP path: video ⇒ sequential matching + loop detection
     loop_detection: bool = True
-    min_registered_frames: int = 30     # quality gate: fewer ⇒ fail fast
+    min_registered_frames: int = 30     # COLMAP quality gate: fewer ⇒ fail fast
     min_registered_ratio: float = 0.55  # registered / extracted-kept
     colmap_bin: str = "colmap"
     glomap_bin: str = "glomap"
-    # lingbot-map feed-forward backend (opt-in `--backend lingbot`; see
-    # LICENSES.md — code Apache-2.0, weights license inferred/unverified).
+    # lingbot-map feed-forward backend (`--backend lingbot`, now default).
     lingbot_python: str = "python"
     lingbot_module: str = "lingbot_map.inference"
     lingbot_model_path: str = "/opt/lingbot-map/weights"
@@ -44,6 +47,13 @@ class GeometryConfig:
     lingbot_use_sdpa: bool = False      # set True on GPUs without FlashInfer (e.g. T4/SM75)
     lingbot_conf_threshold: float = 0.5
     lingbot_max_points: int = 200_000
+    # Honest-failure gate for the feed-forward path: a learned model ALWAYS
+    # emits poses (unlike SfM, which fails to register a bad capture), so we
+    # gate on point CONFIDENCE instead — too few confident points ⇒ fail loud,
+    # preserving the no-hallucination contract. Floors are conservative to
+    # avoid false rejects; tune on the first real-hardware acceptance run.
+    lingbot_min_confident_points: int = 2_000
+    lingbot_min_confident_ratio: float = 0.10
 
 
 @dataclass(frozen=True)
