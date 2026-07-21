@@ -15,6 +15,18 @@
  *              after the user taps, or when `autoload` is set)
  *   height     CSS height of the widget (default 420px)
  *   mode       "orbit" (default) or "walk" (WASD + arrows/drag)
+ *   xr         "vr" or "ar" — immersive WebXR walkthrough. Capability is
+ *              checked BEFORE the renderer is built: XR mode only turns on
+ *              when navigator.xr reports the session type supported (GS3D
+ *              0.4.7 disables its flat-screen orbit controls whenever
+ *              webXRMode is set, so enabling it blind would break non-XR
+ *              devices — verified against its source). On a supported
+ *              device an Enter-VR/AR control appears in the stage after
+ *              load, and the scene is re-based to Y-up (WebXR convention;
+ *              our Z-up frame would render sideways in-headset otherwise).
+ *              Unsupported devices keep the full flat walkthrough. Requires
+ *              HTTPS. Hosts gate their chrome via the `rf-xr` event, which
+ *              fires after load with { requested, supported }.
  *   load-timeout  seconds before an unresponsive load surfaces rf-error
  *                 instead of an infinite spinner (default 120)
  *
@@ -67,10 +79,26 @@ class RfWalkthrough extends HTMLElement {
     this._loaded = false;
   }
 
-  static get observedAttributes() { return ['height']; }
+  static get observedAttributes() { return ['height', 'src']; }
 
-  attributeChangedCallback() {
+  attributeChangedCallback(name, oldValue, newValue) {
     this.style.height = this.getAttribute('height') || '420px';
+    // A changed src on an already-loaded element swaps the scene in place —
+    // the supported path for dashboards; nobody should poke private state.
+    if (name === 'src' && this._loaded && oldValue !== newValue && newValue) {
+      this._reload();
+    }
+  }
+
+  /** Tear down the current viewer and load the (possibly new) src. */
+  _reload() {
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    if (this._viewer) { try { this._viewer.dispose(); } catch (_) { /* gone */ } }
+    this._viewer = null;
+    this._loaded = false;
+    const stale = this.shadowRoot.querySelector('.err');
+    if (stale) stale.remove();
+    this.load();
   }
 
   connectedCallback() {
@@ -125,17 +153,32 @@ class RfWalkthrough extends HTMLElement {
     this._loaded = true;
     const poster = this.shadowRoot.querySelector('.poster');
     const stage = this.shadowRoot.querySelector('.stage');
-    const btn = poster.querySelector('button');
-    btn.textContent = 'Loading…';
+    const btn = poster ? poster.querySelector('button') : null;  // absent on reload
+    if (btn) btn.textContent = 'Loading…';
     try {
       const url = await this.resolveSplatUrl();
+      // XR is decided BEFORE the renderer exists: GS3D 0.4.7 skips its orbit
+      // controls + pointer handlers entirely when webXRMode is set, so it is
+      // only enabled when this device can actually start the session.
+      const requested = this._xrRequested();
+      const supported = requested ? await this._xrSupported(requested) : false;
+      const xrMode = !supported ? GS3D.WebXRMode.None
+        : requested === 'vr' ? GS3D.WebXRMode.VR : GS3D.WebXRMode.AR;
+      // WebXR poses are Y-up; our scene frame is Z-up. In XR mode the scene
+      // (and the flat-preview camera basis) is re-based to Y-up so the room
+      // stands upright in the headset instead of lying on its side.
+      const yUp = xrMode !== GS3D.WebXRMode.None;
+      this._yUp = yUp;
+      const zyx = (v) => (yUp ? [v[0], v[2], -v[1]] : v);
+      if (this._viewer) { try { this._viewer.dispose(); } catch (_) { /* replaced */ } }
       this._viewer = new GS3D.Viewer({
         rootElement: stage,
-        cameraUp: [0, 0, 1],
-        initialCameraPosition: this._attrVec('camera-position', [3, 3, 1.6]),
-        initialCameraLookAt: this._attrVec('look-at', [0, 0, 1]),
+        cameraUp: yUp ? [0, 1, 0] : [0, 0, 1],
+        initialCameraPosition: zyx(this._attrVec('camera-position', [3, 3, 1.6])),
+        initialCameraLookAt: zyx(this._attrVec('look-at', [0, 0, 1])),
         sharedMemoryForWorkers: false,   // host pages keep working without COOP/COEP
         antialiased: false,              // cheaper on mid-range mobile GPUs
+        webXRMode: xrMode,
       });
       // Bounded load: a stalled fetch or broken GPU must surface rf-error,
       // never an infinite spinner.
@@ -145,6 +188,8 @@ class RfWalkthrough extends HTMLElement {
         this._viewer.addSplatScene(url, {
           progressiveLoad: true,
           showLoadingUI: true,
+          // Z-up → Y-up: −90° about X, quaternion [x,y,z,w].
+          rotation: yUp ? [-Math.SQRT1_2, 0, 0, Math.SQRT1_2] : [0, 0, 0, 1],
         }),
         new Promise((_, reject) => setTimeout(
           () => reject(new Error(`scene did not load within ${timeoutS}s`)),
@@ -152,16 +197,39 @@ class RfWalkthrough extends HTMLElement {
         )),
       ]);
       this._viewer.start();
-      poster.remove();
+      if (poster) poster.remove();
       this._setupModes();
       this.dispatchEvent(new CustomEvent('rf-loaded', { detail: { url } }));
+      if (requested) {
+        this.dispatchEvent(new CustomEvent('rf-xr', { detail: { requested, supported } }));
+      }
     } catch (e) {
+      // A half-built viewer must not keep downloading/rendering behind the
+      // error overlay (leaked WebGL contexts add up fast on SPAs).
+      if (this._viewer) { try { this._viewer.dispose(); } catch (_) { /* gone */ } }
+      this._viewer = null;
       const err = document.createElement('div');
       err.className = 'err';
+      err.setAttribute('role', 'alert');   // announce the failure, honestly
       err.textContent = `Could not load scene: ${e.message || e}`;
       this.shadowRoot.appendChild(err);
-      poster.remove();
+      if (poster) poster.remove();
       this.dispatchEvent(new CustomEvent('rf-error', { detail: { error: String(e) } }));
+    }
+  }
+
+  _xrRequested() {
+    const raw = (this.getAttribute('xr') || '').toLowerCase();
+    return raw === 'vr' || raw === 'ar' ? raw : null;
+  }
+
+  async _xrSupported(requested) {
+    if (!navigator.xr || !navigator.xr.isSessionSupported) return false;
+    try {
+      return await navigator.xr.isSessionSupported(
+        requested === 'vr' ? 'immersive-vr' : 'immersive-ar');
+    } catch (_) {
+      return false;
     }
   }
 
@@ -181,6 +249,17 @@ class RfWalkthrough extends HTMLElement {
     if (!walk) return;
 
     this.tabIndex = 0; // make the element focusable for key events
+    if (!this.hasAttribute('aria-label')) {
+      // The focus stop needs a name; the hint text doubles as the recipe.
+      this.setAttribute(
+        'aria-label', '3D scene walkthrough — W, A, S, D to move, arrow keys to turn'
+      );
+    }
+    // Removing the poster (the previous focus target) drops keyboard focus to
+    // <body>; hand it to the element so keys work immediately.
+    if (this.shadowRoot.activeElement === null && document.activeElement === document.body) {
+      this.focus({ preventScroll: true });
+    }
     this.addEventListener('keydown', (e) => {
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
           .includes(e.code)) {
@@ -205,12 +284,15 @@ class RfWalkthrough extends HTMLElement {
     const v = this._viewer;
     if (!v || !v.camera || this._keys.size === 0) return;
     const cam = v.camera;
+    const up = this._yUp
+      ? new THREE.Vector3(0, 1, 0)     // XR-enabled: scene re-based to Y-up
+      : new THREE.Vector3(0, 0, 1);    // SceneForge native Z-up
     const fwd = new THREE.Vector3();
     cam.getWorldDirection(fwd);
-    fwd.z = 0;                          // stay at eye height — it's a walkthrough
+    fwd.addScaledVector(up, -fwd.dot(up));  // stay at eye height — it's a walkthrough
     if (fwd.lengthSq() < 1e-6) return;
     fwd.normalize();
-    const right = new THREE.Vector3(fwd.y, -fwd.x, 0);
+    const right = new THREE.Vector3().crossVectors(fwd, up);
     const move = new THREE.Vector3();
     if (this._keys.has('KeyW') || this._keys.has('ArrowUp')) move.add(fwd);
     if (this._keys.has('KeyS') || this._keys.has('ArrowDown')) move.sub(fwd);
@@ -227,9 +309,10 @@ class RfWalkthrough extends HTMLElement {
     }
     if (yaw !== 0 && v.controls && v.controls.target) {
       const t = v.controls.target.clone().sub(cam.position);
-      const c = Math.cos(yaw), s = Math.sin(yaw);
-      const x = t.x * c - t.y * s, y = t.x * s + t.y * c;
-      v.controls.target.set(cam.position.x + x, cam.position.y + y, v.controls.target.z);
+      const vertical = up.clone().multiplyScalar(t.dot(up));
+      const planar = t.clone().sub(vertical);
+      planar.applyAxisAngle(up, yaw);
+      v.controls.target.copy(cam.position).add(planar).add(vertical);
     }
     if (v.controls) v.controls.update();
   }

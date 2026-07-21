@@ -70,6 +70,11 @@ class Settings:
     # Observability (observability.py). log_format json|text; metrics_token
     # gates /metrics (empty ⇒ /metrics returns 404, i.e. metrics disabled by
     # default so scene/tenant counts aren't publicly exposed).
+    # Browser dashboards (e.g. the Pages app's "Connect your API" flow) need
+    # CORS. Comma-separated explicit origins; empty (default) = no CORS
+    # headers at all, preserving the locked-down server-to-server posture.
+    # Never use "*": responses carry Authorization-derived tenant data.
+    cors_origins: str = field(default_factory=lambda: _env("SCENEFORGE_CORS_ORIGINS", ""))
     log_format: str = field(default_factory=lambda: _env("SCENEFORGE_LOG_FORMAT", "json"))
     log_level: str = field(default_factory=lambda: _env("SCENEFORGE_LOG_LEVEL", "INFO"))
     metrics_token: str = field(default_factory=lambda: _env("SCENEFORGE_METRICS_TOKEN", ""))

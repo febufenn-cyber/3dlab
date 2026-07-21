@@ -42,6 +42,29 @@ docker compose -f docker/docker-compose.yml exec api python -m sceneforge_api.ke
 Put the worker key into `.env` as `SCENEFORGE_WORKER_API_KEY` and restart the
 dispatcher. Front with Caddy/nginx + TLS (not in compose; any ACME setup works).
 
+### Browser dashboards (CORS) — required for the app's "Connect your API" flow
+
+Two layers must both allow the browser's origin:
+
+1. **API**: set `SCENEFORGE_CORS_ORIGINS` to the exact origin(s), e.g.
+   `SCENEFORGE_CORS_ORIGINS=https://<user>.github.io` — comma-separated,
+   never `*` (responses carry tenant data). Unset (default) = no CORS,
+   server-to-server only.
+2. **R2 bucket** (presigned PUT goes straight from the browser to R2):
+   apply a CORS policy on the bucket — Cloudflare dashboard → R2 → bucket →
+   Settings → CORS policy:
+
+   ```json
+   [{
+     "AllowedOrigins": ["https://<user>.github.io"],
+     "AllowedMethods": ["PUT"],
+     "AllowedHeaders": ["content-type"],
+     "MaxAgeSeconds": 3600
+   }]
+   ```
+
+Without both, the app's upload flow fails at preflight — by design, not by bug.
+
 ## Deploy — GPU worker
 
 ```bash

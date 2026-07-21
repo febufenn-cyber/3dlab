@@ -36,14 +36,17 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p site
+          cp -r viewer/app site/app
           cp -r viewer/demo site/demo
           cp -r viewer/dist site/dist
           touch site/.nojekyll
+          # Front door is the app (2D experience; vision.html sits beside it).
+          # Path layout mirrors viewer/ so ../dist and ../demo work unchanged.
           cat > site/index.html <<'EOF'
           <!DOCTYPE html><html><head><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=demo/">
-          <title>SceneForge demo</title></head>
-          <body><a href="demo/">SceneForge viewer demo</a></body></html>
+          <meta http-equiv="refresh" content="0; url=app/">
+          <title>SceneForge</title></head>
+          <body><a href="app/">SceneForge</a></body></html>
           EOF
       - name: Publish to gh-pages
         run: |

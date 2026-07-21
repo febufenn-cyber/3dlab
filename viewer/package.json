@@ -1,6 +1,6 @@
 {
   "name": "@sceneforge/viewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Embeddable <rf-walkthrough> web component for SceneForge Gaussian-splat scenes",
   "license": "MIT",
   "type": "module",

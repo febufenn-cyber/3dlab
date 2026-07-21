@@ -124,6 +124,18 @@ def create_app(
     app = FastAPI(title="SceneForge API", version="1.0", lifespan=lifespan)
     # Order: MetricsMiddleware added last ⇒ outermost, so it times and counts
     # everything including body-limit 413s. BodyLimit stays inner.
+    if settings.cors_origins.strip():
+        # Explicit origins only (browser dashboards). allow_credentials stays
+        # False: auth is the Bearer header, never cookies, so no CSRF surface.
+        from fastapi.middleware.cors import CORSMiddleware
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+            max_age=3600,
+        )
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_kb * 1024)
     app.add_middleware(MetricsMiddleware)
     create_limiter = RateLimiter(
